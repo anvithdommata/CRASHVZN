@@ -1,9 +1,13 @@
 import { hasModel, interruptTurn, sendMessage } from "@/assistant/bridge";
 import { useChatStore, type ChatItem, type ToolChip } from "@/assistant/chatStore";
 import type { AssistantEffort } from "@/electron.d";
+import { AnalysisPanel } from "@/components/KinematicsPanel";
 import { ResizeHandle } from "@/components/ResizeHandle";
+import { Tabs, readPref, writePref } from "@/components/ui";
+import { formatClock, formatRelative } from "@/lib/time";
 import { RIGHT_RAIL, useAppStore } from "@/store/useAppStore";
-import { ArrowUp, Check, ChevronDown, CircleAlert, Loader2, PanelRightClose, PanelRightOpen, Sparkles, Square, Trash2, X, Zap } from "lucide-react";
+import { useProvidersStore } from "@/store/useProvidersStore";
+import { ArrowUp, Check, ChevronDown, CircleAlert, Gauge, Loader2, MessageSquare, PanelRightClose, PanelRightOpen, Settings, Sparkles, Square, Trash2, X, Zap } from "lucide-react";
 import { useVoiceHotkey, VoiceButton } from "@/voice";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -17,13 +21,30 @@ const CLAUDE_MODELS: ModelOption[] = [
 ];
 const EFFORTS: AssistantEffort[] = ["low", "medium", "high"];
 
-/** What the picker offers, like T3 Code's: providers, each with its models and effort levels. */
+/**
+ * What the picker offers, like T3 Code's: providers, each with its models and effort levels.
+ * Mirrors packages/assistant/src/providers/catalog.ts (chat-capable entries); sign-in and API keys
+ * live on the Providers page.
+ */
 const CATALOG: ProviderOption[] = [
   { kind: "claude", label: "Claude", detail: "Claude Code login", models: CLAUDE_MODELS, efforts: EFFORTS },
   { kind: "codex", label: "Codex", detail: "ChatGPT login", models: [{ id: "", label: "Default model" }], efforts: EFFORTS },
+  { kind: "opencode", label: "OpenCode", detail: "OpenCode login", models: [{ id: "", label: "Default model" }], efforts: [] },
   { kind: "gemini", label: "Gemini", detail: "Gemini CLI login", models: [{ id: "", label: "Default model" }], efforts: [] },
-  { kind: "gemini-api", label: "Gemini API", detail: "API key", models: [{ id: "", label: "Gemini 3.1 Flash Lite" }], efforts: [] },
+  { kind: "grok", label: "Grok", detail: "Grok CLI login", models: [{ id: "", label: "Default model" }], efforts: [] },
   { kind: "anthropic-api", label: "Claude API", detail: "API key", models: CLAUDE_MODELS, efforts: EFFORTS },
+  {
+    kind: "openai-api",
+    label: "OpenAI API",
+    detail: "API key",
+    models: [
+      { id: "gpt-5.5", label: "GPT-5.5" },
+      { id: "gpt-6-luna", label: "GPT-6 Luna" },
+      { id: "gpt-6.1-sol", label: "GPT-6.1 Sol" },
+    ],
+    efforts: EFFORTS,
+  },
+  { kind: "gemini-api", label: "Gemini API", detail: "API key", models: [{ id: "", label: "Gemini 3.1 Flash Lite" }], efforts: [] },
 ];
 
 const TOOL_VERBS: Record<string, string> = {
@@ -54,7 +75,7 @@ const TOOL_VERBS: Record<string, string> = {
   export_video: "Starting the export",
 };
 
-const toolName = (name: string) => name.replace(/^mcp__reconstruct__/, "");
+const toolName = (name: string) => name.replace(/^mcp__crashvzn__/, "");
 
 function choiceLabel(provider?: string, model?: string, effort?: string) {
   const option = CATALOG.find((item) => item.kind === provider);
@@ -78,6 +99,11 @@ export function AssistantPanel() {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const desktop = hasModel();
+  const [tab, setTabState] = useState<"chat" | "analysis">(() => readPref("crashvzn.rightTab", ["chat", "analysis"] as const, "chat"));
+  const setTab = (next: "chat" | "analysis") => {
+    setTabState(next);
+    writePref("crashvzn.rightTab", next);
+  };
 
   const busy = useMemo(() => items.some((item) => item.kind === "assistant" && !item.done), [items]);
 
@@ -118,7 +144,7 @@ export function AssistantPanel() {
       />
       <aside
         style={{ width, transform: `translateX(${open ? 0 : hiddenX}px)` }}
-        className={`absolute inset-y-0 right-0 z-30 flex flex-col border-l border-white/10 bg-[#0b0b0c] text-white shadow-[-4px_0_24px_rgba(0,0,0,0.35)] ${
+        className={`absolute inset-y-0 right-0 z-30 flex flex-col border-l border-line bg-panel text-ink shadow-[-4px_0_32px_rgba(0,0,0,0.45)] ${
           isResizing ? "" : "transition-transform duration-200 ease-in-out"
         }`}
       >
@@ -137,16 +163,22 @@ export function AssistantPanel() {
           </button>
           {open && (
             <>
-              <Sparkles size={16} className="shrink-0 text-[#d97757]" />
-              <span className="text-sm font-medium">Assistant</span>
-              <span className="min-w-0 flex-1 truncate text-xs text-white/40" title={statusText}>
-                {status === "starting" ? "Starting…" : status === "error" ? statusText : ""}
-              </span>
+              <div className="min-w-0 flex-1">
+                <Tabs
+                  label="Assistant sections"
+                  value={tab}
+                  onChange={setTab}
+                  tabs={[
+                    { id: "chat", label: "Chat", icon: <MessageSquare size={13} /> },
+                    { id: "analysis", label: "Analysis", icon: <Gauge size={13} /> },
+                  ]}
+                />
+              </div>
               <button
                 type="button"
                 aria-label="Clear the conversation view"
                 title="Clear the conversation view"
-                disabled={items.length === 0 || busy}
+                disabled={items.length === 0 || busy || tab !== "chat"}
                 className="rounded-full p-1.5 text-white/50 hover:bg-white/10 hover:text-white disabled:opacity-30"
                 onClick={clear}
               >
@@ -156,7 +188,24 @@ export function AssistantPanel() {
           )}
         </header>
 
-        {open && (
+        {open && (status === "starting" || status === "error") && (
+          <div
+            className={`mx-3 mb-1 flex items-center gap-1.5 truncate rounded-lg px-2.5 py-1.5 text-[11px] ${status === "error" ? "bg-crash-soft text-crash" : "bg-white/5 text-ink-3"}`}
+            title={statusText}
+          >
+            {status === "starting" ? <Loader2 size={12} className="shrink-0 animate-spin" /> : <CircleAlert size={12} className="shrink-0" />}
+            <span className="truncate">{status === "starting" ? "Starting the assistant…" : statusText}</span>
+          </div>
+        )}
+        {open && <ContextStrip />}
+
+        {open && tab === "analysis" && (
+          <div className="flex-1 overflow-y-auto px-3 py-3">
+            <AnalysisPanel />
+          </div>
+        )}
+
+        {open && tab === "chat" && (
           <>
             <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
               {items.length === 0 ? (
@@ -168,7 +217,7 @@ export function AssistantPanel() {
             </div>
 
             <div className="px-3 pb-3">
-              <div className="rounded-2xl border border-white/10 bg-[#1f1f21] focus-within:border-white/25">
+              <div className="rounded-2xl border border-line bg-raised focus-within:border-accent/50">
                 <textarea
                   ref={inputRef}
                   value={draft}
@@ -229,17 +278,54 @@ export function AssistantPanel() {
   );
 }
 
+/** What's open and where the playhead is, so it's clear what the assistant is looking at. */
+function ContextStrip() {
+  const view = useAppStore((state) => state.view);
+  const scene = useAppStore((state) => state.scenes.find((item) => item.id === state.selectedId));
+  const time = useAppStore((state) => state.time);
+  const impactTime = useAppStore((state) => state.impactTime);
+  const text =
+    view === "viewer" && scene
+      ? scene.title
+      : "Library";
+  return (
+    <div className="mx-3 mb-1 flex items-center gap-2 rounded-lg border border-line bg-sunken px-2.5 py-1.5 text-[11px] text-ink-3">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" aria-hidden />
+      <span className="min-w-0 flex-1 truncate text-ink-2" title="What the assistant is looking at">
+        {text}
+      </span>
+      {view === "viewer" && scene && (
+        <span className="shrink-0 tabular-nums">
+          {formatClock(time)}
+          {impactTime != null && <span className={time >= impactTime ? "text-crash" : ""}> · {formatRelative(time, impactTime)}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function EmptyState({ onPick, desktop }: { onPick: (text: string) => void; desktop: boolean }) {
   const view = useAppStore((state) => state.view);
+  const scene = useAppStore((state) => state.scenes.find((item) => item.id === state.selectedId));
+  const library = useAppStore((state) => state.scenes);
+  // Suggestions name what's actually in the open scene (or the library).
+  const crashVehicles = scene ? scene.vehicles.filter((vehicle) => (scene.crashVehicles ?? []).includes(vehicle.id)) : [];
+  const first = crashVehicles[0] ?? scene?.vehicles[0];
+  const second = crashVehicles[1];
   const suggestions =
     view === "home"
-      ? ["Open the roundabout collision", "What reconstructions do I have?"]
+      ? [...(library[0] ? [`Open ${library[0].title}`] : []), "What reconstructions do I have?"]
       : desktop
-        ? ["Show me the crash from above", "Follow the red sedan", "Go to 3 seconds before the crash and pause", "Show the original footage"]
+        ? [
+            "Show me the crash from above",
+            ...(first ? [`How fast was the ${first.label} at impact?`, `Follow the ${first.label}`] : []),
+            ...(second ? [`Driver's-eye view from the ${second.label}`] : []),
+            "Go to 3 seconds before the crash and pause",
+          ].slice(0, 4)
         : ["top view", "jump to the crash", "slow motion", "zoom in"];
   return (
     <div className="flex h-full flex-col justify-end pb-2">
-      <Sparkles size={28} className="mb-3 text-[#d97757]" />
+      <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-[#d97757]/15"><Sparkles size={20} className="text-[#d97757]" /></div>
       <p className="mb-1 text-sm text-white/85">I can move the camera, play the footage and answer questions about this reconstruction.</p>
       <p className="mb-4 text-xs text-white/40">{desktop ? "Type, or hold the mic (or Ctrl+M) to talk." : "Open the desktop app to talk to the model."}</p>
       <div className="flex flex-col items-start gap-2">
@@ -335,7 +421,7 @@ function ModelPicker({ disabled }: { disabled: boolean }) {
   }, [open]);
 
   const pick = async (opts: { provider?: string; model?: string; effort?: AssistantEffort | "" }) => {
-    const api = window.reconstruct?.assistant;
+    const api = window.crashvzn?.assistant;
     if (!api) return;
     setStatus("starting");
     try {
@@ -419,6 +505,18 @@ function ModelPicker({ disabled }: { disabled: boolean }) {
                 ))}
               </div>
             </div>
+          )}
+          {window.crashvzn?.providers && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                useProvidersStore.getState().setOpen(true);
+              }}
+              className="flex w-full items-center gap-2 border-t border-white/10 px-3 py-2 text-left text-xs text-white/60 hover:bg-white/5 hover:text-white"
+            >
+              <Settings size={13} /> Manage providers and sign-ins…
+            </button>
           )}
         </div>
       )}

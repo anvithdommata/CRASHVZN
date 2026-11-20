@@ -2,8 +2,8 @@ import { Check, Copy, Terminal } from "lucide-react";
 import { useState } from "react";
 
 const commands = [
-  { label: "Clone", value: "git clone https://github.com/AarnavKannan/sunhacks.git" },
-  { label: "Assistant", value: "cd sunhacks/packages/assistant && npm install" },
+  { label: "Clone", value: "git clone https://github.com/anvithdommata/CRASHVZN.git" },
+  { label: "Assistant", value: "cd CRASHVZN/packages/assistant && npm install" },
   { label: "App", value: "cd ../../FrontEnd/app && npm install && npm start" },
 ];
 

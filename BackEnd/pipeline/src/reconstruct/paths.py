@@ -13,18 +13,18 @@ def repo_root() -> Path:
             if candidate in seen:
                 continue
             seen.add(candidate)
-            if (candidate / "schema" / "manifest.schema.json").is_file() and (
+            if (candidate / "BackEnd" / "schema" / "manifest.schema.json").is_file() and (
                 candidate / "demo.mp4"
             ).is_file():
                 return candidate
     raise FileNotFoundError(
-        "Could not find the repository root (expected schema/manifest.schema.json and demo.mp4)."
+        "Could not find the repository root (expected BackEnd/schema/manifest.schema.json and demo.mp4)."
     )
 
 
 def default_config() -> Path:
-    return repo_root() / "pipeline" / "configs" / "incident-demo.yaml"
+    return repo_root() / "BackEnd" / "pipeline" / "configs" / "incident-demo.yaml"
 
 
 def schema_dir() -> Path:
-    return repo_root() / "schema"
+    return repo_root() / "BackEnd" / "schema"

@@ -8,7 +8,7 @@ Class overlay colors (cyan / yellow / green) are the manifest legend, not paint.
 
 from __future__ import annotations
 
-from BackEnd.pipeline.src.reconstruct.models import Dims, Entity
+from reconstruct.models import Dims, Entity
 
 LABEL_FIELDS = (
     "label",

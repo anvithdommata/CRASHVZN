@@ -12,7 +12,7 @@ const status = (value) => writeFileSync(statusPath, JSON.stringify(value, null, 
 
 app.whenReady().then(async () => {
   const deadline = setTimeout(() => { status({ passed: false, error: "Renderer startup timed out after 60 seconds" }); app.exit(1); }, 60000);
-  const dir = await mkdtemp(path.join(tmpdir(), "reconstruct-render-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "crashvzn-render-"));
   let win;
   let exitCode = 0;
   try {
@@ -21,11 +21,11 @@ app.whenReady().then(async () => {
     const result = JSON.parse(await readFile(path.join(__dirname, "codex-vision-live-result.json"), "utf8"));
     const js = await build({
       stdin: { contents: `
-        import { buildGeminiScene } from "./src/gemini/engine";
+        import { buildIncidentScene } from "./src/incident/engine";
         import { mountScene } from "./src/scene/mountScene";
         (async () => {
           console.log("smoke: engine");
-          const built = buildGeminiScene({id: "codex-render-smoke", spec: ${JSON.stringify(result.spec)}, seed: 42, created: "2026-11-15"});
+          const built = buildIncidentScene({id: "codex-render-smoke", spec: ${JSON.stringify(result.spec)}, seed: 42, created: "2026-11-15"});
           console.log("smoke: mounting viewer");
           const viewer = await mountScene(document.getElementById("view"), () => {});
           console.log("smoke: loading scene");

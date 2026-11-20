@@ -47,6 +47,7 @@ import { crashOrigin, sceneContacts, sceneStatics } from "@/kinematics/derive";
 import { incidentMeta, sampleKinematics } from "@/kinematics/store";
 import { startExport } from "@/lib/exportVideo";
 import { whenSceneReady } from "@/scene/activeScene";
+import { FREE_CAMERA } from "@/scene/camera";
 import type { Point3, SceneHandle } from "@/scene/mountScene";
 import { MAX_SPEED, MIN_SPEED, useAppStore } from "@/store/useAppStore";
 
@@ -216,15 +217,20 @@ function cameraState(handle: SceneHandle, o: Vec3, clamped = false): CameraState
     position: toWorld(pose.position, o),
     target: toWorld(pose.target, o),
     distance_m: round(len(sub(pose.position, pose.target))),
-    following: state.following,
-    pov: state.pov,
+    // The tool contract reports the mode as two fields; at most one is set.
+    following: state.cameraMode.kind === "follow" ? state.cameraMode.entityId : null,
+    pov: state.cameraMode.kind === "pov" ? state.cameraMode.entityId : null,
     clamped,
   };
 }
 
-/** Moves the camera in scene coordinates and reports the result in world coordinates. */
+/**
+ * Moves the camera in scene coordinates and reports the result in world coordinates. Any explicit
+ * move leaves POV; it also stops following unless `keepFollow` (orbit and zoom keep the same target).
+ */
 function commit(handle: SceneHandle, o: Vec3, position: Vec3, target: Vec3, keepFollow = false): CameraState {
-  store().setCameraMode({ pov: null, ...(keepFollow ? {} : { following: null }) });
+  const mode = store().cameraMode;
+  store().setCameraMode(keepFollow && mode.kind === "follow" ? mode : FREE_CAMERA);
   const placed = handle.setCamera({ position, target });
   return cameraState(handle, o, placed.clamped);
 }
@@ -402,7 +408,8 @@ export const appSceneController: SceneController = {
     requireEntity(scene, entityId);
     const target = vehiclePoint(handle, entityId);
     const { yaw, pitch } = angles(handle);
-    const keep = store().following === entityId;
+    const mode = store().cameraMode;
+    const keep = mode.kind === "follow" && mode.entityId === entityId;
     return commit(handle, o, around(target, distanceM, yaw, Math.max(pitch, 15)), target, keep);
   },
 
@@ -480,10 +487,10 @@ export const appSceneController: SceneController = {
       const target = vehiclePoint(handle, entityId);
       // Bring it into frame first if the camera is far away.
       const d = distance > 45 ? FOLLOW_DISTANCE : distance;
-      store().setCameraMode({ following: null, pov: null });
+      store().setCameraMode(FREE_CAMERA);
       handle.setCamera({ position: around(target, d, yaw, Math.max(pitch, 15)), target });
     }
-    store().setCameraMode({ following: entityId, pov: null });
+    store().setCameraMode(entityId ? { kind: "follow", entityId } : FREE_CAMERA);
     return cameraState(handle, o);
   },
 
@@ -493,7 +500,7 @@ export const appSceneController: SceneController = {
       requireEntity(scene, entityId);
       vehiclePoint(handle, entityId); // seeks into the time it's on the road, if it isn't now
     }
-    store().setCameraMode({ pov: entityId, following: null });
+    store().setCameraMode(entityId ? { kind: "pov", entityId } : FREE_CAMERA);
     handle.render();
     return cameraState(handle, o);
   },
@@ -617,9 +624,6 @@ export const appSceneController: SceneController = {
   async toggle(target: ToggleTarget, visible?: boolean) {
     const scene = openScene();
     const state = store();
-    if (target === "frustums") {
-      throw new Error("This reconstruction doesn't include the source camera positions, so there's nothing to show.");
-    }
     if (target === "source_video") {
       if (!scene.sourceVideo) throw new Error("This reconstruction has no source video attached.");
       const next = visible ?? !state.layers.sourceVideo;

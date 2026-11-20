@@ -1,6 +1,6 @@
 // Runs inside the hidden Electron window (bundled by compare.cjs). Real engine + real viewer.
 import * as THREE from "three";
-import { buildGeminiScene } from "../../../src/gemini/engine";
+import { buildIncidentScene } from "../../../src/incident/engine";
 import { mountScene } from "../../../src/scene/mountScene";
 import { sourceCamera, calibProject, worldToScene, CX, CY, TILE_W, TILE_H, type Calib } from "./source-camera";
 
@@ -64,7 +64,7 @@ const r2 = (x: number | null) => (x == null ? null : Math.round(x * 100) / 100);
   const cal = __CALIB__;
   const cam = sourceCamera(cal);
   const project = makeProjector(cam);
-  const built = buildGeminiScene({ id: "demo-fit", spec, seed: 42, created: "2026-11-15" });
+  const built = buildIncidentScene({ id: "demo-fit", spec, seed: 42, created: "2026-11-15" });
   const view = document.getElementById("view")!;
   view.style.width = RW + "px"; view.style.height = RH + "px";
   const viewer = await mountScene(view, () => {});

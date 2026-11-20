@@ -10,7 +10,7 @@ import { deriveSceneKinematics } from "@/kinematics/derive";
 const syncs = new Map<string, Promise<boolean>>();
 
 function api() {
-  const kinematics = window.reconstruct?.kinematics;
+  const kinematics = window.crashvzn?.kinematics;
   if (!kinematics) throw new Error("Motion data is stored in the desktop app's database; it isn't available in a plain browser.");
   return kinematics;
 }
@@ -40,7 +40,7 @@ export function forgetKinematics(sceneId: string) {
 
 /** Called once at startup in the desktop app: loads every built-in scene into the database. */
 export async function syncBuiltinScenes() {
-  if (!window.reconstruct?.kinematics) return;
+  if (!window.crashvzn?.kinematics) return;
   for (const scene of BUILTIN_SCENES) {
     try {
       await ensureKinematics(scene);

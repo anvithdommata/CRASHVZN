@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
-from BackEnd.pipeline.src.reconstruct.models import CarriagewayId, VehicleType
+from reconstruct.models import CarriagewayId, VehicleType
 
 
 class LocalRef(BaseModel):

@@ -17,7 +17,7 @@ let localTurn = 1_000_000;
 
 /** Answers the main process's tool calls. Returns an unsubscribe function. */
 export function connectSceneBridge() {
-  const api = window.reconstruct;
+  const api = window.crashvzn;
   if (!api?.scene) return () => {};
   const offCalls = api.scene.onCall(async ({ id, method, args }) => {
     try {
@@ -37,7 +37,7 @@ export function connectSceneBridge() {
 }
 
 export function hasModel() {
-  return Boolean(window.reconstruct?.assistant);
+  return Boolean(window.crashvzn?.assistant);
 }
 
 /** Sends one message from the chat box. */
@@ -47,9 +47,9 @@ export async function sendMessage(text: string) {
   if (!trimmed) return;
   chat.addUser(trimmed);
 
-  if (window.reconstruct?.assistant) {
+  if (window.crashvzn?.assistant) {
     try {
-      const { turn } = await window.reconstruct.assistant.send(trimmed);
+      const { turn } = await window.crashvzn.assistant.send(trimmed);
       useChatStore.getState().beginTurn(turn);
     } catch (error) {
       const turn = ++localTurn;
@@ -80,7 +80,7 @@ export async function sendMessage(text: string) {
 }
 
 export async function interruptTurn() {
-  await window.reconstruct?.assistant?.interrupt().catch(() => {});
+  await window.crashvzn?.assistant?.interrupt().catch(() => {});
   const items = useChatStore.getState().items;
   const last = [...items].reverse().find((item) => item.kind === "assistant" && !item.done);
   if (last && last.kind === "assistant") useChatStore.getState().finishTurn(last.turn, "Stopped.");

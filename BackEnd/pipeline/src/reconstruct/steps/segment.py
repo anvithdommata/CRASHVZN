@@ -6,8 +6,8 @@ from collections.abc import Iterable
 
 from pydantic import BaseModel, ConfigDict
 
-from BackEnd.pipeline.src.reconstruct.errors import StepNotRun
-from BackEnd.pipeline.src.reconstruct.steps.associate import GlobalEntity
+from reconstruct.errors import StepNotRun
+from reconstruct.steps.associate import GlobalEntity
 
 
 class MaskTrack(BaseModel):

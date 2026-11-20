@@ -11,8 +11,8 @@ from collections.abc import Iterable, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from BackEnd.pipeline.src.reconstruct.models import VehicleType
-from BackEnd.pipeline.src.reconstruct.steps.boxes import RawBox, detect_boxes
+from reconstruct.models import VehicleType
+from reconstruct.steps.boxes import RawBox, detect_boxes
 
 
 class Box(BaseModel):

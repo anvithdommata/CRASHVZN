@@ -8,6 +8,9 @@ import { CodexCliAdapter } from "./providers/codex-cli";
 import { GeminiApiAdapter } from "./providers/gemini-api";
 import { geminiApiKeyFromEnv } from "./providers/health";
 import { GeminiCliAdapter } from "./providers/gemini-cli";
+import { GrokCliAdapter } from "./providers/grok-cli";
+import { OpenAiApiAdapter } from "./providers/openai-api";
+import { OpenCodeCliAdapter } from "./providers/opencode-cli";
 import type { AssistantEvent, Effort, ProviderAdapter, ProviderKind } from "./providers/types";
 import { callTool } from "./tools/registry";
 
@@ -21,6 +24,10 @@ export interface AssistantSessionOptions {
   apiKey?: string;
   /** For "gemini-api"; defaults to GEMINI_API_KEY / GOOGLE_API_KEY from the environment. */
   geminiApiKey?: string;
+  /** For "openai-api"; defaults to OPENAI_API_KEY from the environment. Kept in memory only. */
+  openaiApiKey?: string;
+  /** Extra env for CLI adapters (e.g. XAI_API_KEY for Grok). */
+  env?: NodeJS.ProcessEnv;
   prompt?: SystemPromptContext;
   /** Default true. Set false to send everything to the LLM (useful for testing the prompt). */
   fastPath?: boolean;
@@ -84,7 +91,10 @@ export class AssistantSession {
   }
 
   /** Swap providers mid-session (conversation history does not carry over). */
-  async switchProvider(provider: ProviderKind, extra: Pick<AssistantSessionOptions, "model" | "effort" | "apiKey"> = {}): Promise<void> {
+  async switchProvider(
+    provider: ProviderKind,
+    extra: Pick<AssistantSessionOptions, "model" | "effort" | "apiKey" | "geminiApiKey" | "openaiApiKey" | "env"> = {},
+  ): Promise<void> {
     await this.adapter.stop();
     this.opts = { ...this.opts, provider, ...extra };
     this.adapter = makeAdapter(this.opts, this.mcp);
@@ -99,7 +109,7 @@ export class AssistantSession {
 
 function makeAdapter(opts: AssistantSessionOptions, mcp: RunningMcpServer): ProviderAdapter {
   const systemPrompt = buildSystemPrompt(opts.prompt);
-  const base = { mcp: { url: mcp.url, token: mcp.token }, systemPrompt, model: opts.model, effort: opts.effort };
+  const base = { mcp: { url: mcp.url, token: mcp.token }, systemPrompt, model: opts.model, effort: opts.effort, env: opts.env };
   switch (opts.provider) {
     case "claude":
       return new ClaudeCliAdapter(base);
@@ -107,6 +117,17 @@ function makeAdapter(opts: AssistantSessionOptions, mcp: RunningMcpServer): Prov
       return new CodexCliAdapter(base);
     case "gemini":
       return new GeminiCliAdapter(base);
+    case "opencode":
+      return new OpenCodeCliAdapter(base);
+    case "grok":
+      return new GrokCliAdapter(base);
+    case "cursor":
+      throw new Error("Chat with Cursor isn't supported yet. Pick another provider.");
+    case "openai-api": {
+      const apiKey = opts.openaiApiKey ?? process.env.OPENAI_API_KEY;
+      if (!apiKey) throw new Error("An OpenAI API key is required for the OpenAI API fallback.");
+      return new OpenAiApiAdapter({ apiKey, systemPrompt, controller: opts.controller, model: opts.model, effort: opts.effort });
+    }
     case "gemini-api": {
       const apiKey = opts.geminiApiKey ?? geminiApiKeyFromEnv();
       if (!apiKey) throw new Error("A Gemini API key is required for the Gemini API fallback.");

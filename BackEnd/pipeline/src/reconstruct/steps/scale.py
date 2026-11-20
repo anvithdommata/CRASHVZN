@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from BackEnd.pipeline.src.reconstruct.steps.cache import write_step_cache
+from reconstruct.steps.cache import write_step_cache
 
 
 @dataclass(frozen=True)

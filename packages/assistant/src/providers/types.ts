@@ -6,8 +6,22 @@
 /**
  * CLI kinds run on the user's own subscription login (preferred).
  * `*-api` kinds are API-key fallbacks, used only when no CLI login works.
+ * "cursor" is detected and can be signed in to, but has no chat adapter yet
+ * (see providers/catalog.ts).
  */
-export type ProviderKind = "claude" | "codex" | "gemini" | "gemini-api" | "anthropic-api";
+export type ProviderKind =
+  | "claude"
+  | "codex"
+  | "gemini"
+  | "opencode"
+  | "grok"
+  | "cursor"
+  | "gemini-api"
+  | "anthropic-api"
+  | "openai-api";
+
+/** Kinds that authenticate with an API key we store (never a CLI login). */
+export type ApiKeyKind = "anthropic-api" | "openai-api" | "gemini-api";
 
 export type AssistantEvent =
   /** Streamed assistant text. Concatenate deltas within a turn. */
@@ -57,7 +71,7 @@ export interface ProviderHealth {
   installed: boolean;
   version?: string;
   auth: AuthStatus;
-  /** e.g. "claude.ai (pro)", "ChatGPT", "ANTHROPIC_API_KEY". */
+  /** e.g. "Claude Pro", "ChatGPT", "API key". */
   authDetail?: string;
   /** Plain-language next step when it's not usable, e.g. "Run `claude auth login`". */
   hint?: string;

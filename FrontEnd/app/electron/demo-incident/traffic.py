@@ -2,7 +2,7 @@
 Background traffic for the hand-authored demo incident (demo.mp4, 59.92 s).
 
 A deterministic per-lane car-following simulation (IDM) on a 3+3 lane German motorway,
-sampled into SpecObject dicts (see FrontEnd/app/src/gemini/spec.ts). Standard library only.
+sampled into SpecObject dicts (see FrontEnd/app/src/incident/spec.ts). Standard library only.
 
     from traffic import background_objects
     objs = background_objects(seed=7)

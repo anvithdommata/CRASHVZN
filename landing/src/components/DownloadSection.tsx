@@ -15,7 +15,7 @@ export function DownloadSection() {
             <p>A local workspace for reconstructing incidents and explaining what happened. Free during beta.</p>
             <div className="download-actions">
               <DownloadButton label="Get CRASHVZN" />
-              <a className="text-link" href="https://github.com/AarnavKannan/sunhacks" target="_blank" rel="noreferrer">Explore the source <ArrowUpRight size={16} /></a>
+              <a className="text-link" href="https://github.com/anvithdommata/CRASHVZN" target="_blank" rel="noreferrer">Explore the source <ArrowUpRight size={16} /></a>
             </div>
             <div className="download-notes">
               <DownloadMeta />

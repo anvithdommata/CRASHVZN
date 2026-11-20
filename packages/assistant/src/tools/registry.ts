@@ -2,15 +2,20 @@ import { z } from "zod";
 import type { SceneController } from "../controller";
 import { CAMERA_PRESET_NAMES, KINEMATICS_FIELDS, type CameraPreset, type KinematicsField, type TimeRef, type ToggleTarget, type Vec3 } from "../types";
 
+// This registry also runs in the app's renderer, whose Content-Security-Policy forbids eval
+// (FrontEnd/app/vite.config.ts). Without this, Zod probes `new Function` once and logs a CSP
+// violation before falling back. Tool arguments are tiny, so the interpreted path costs nothing.
+z.config({ jitless: true });
+
 /**
- * The assistant's tool surface (requirements §7 plus ux-features.md), defined
+ * The assistant's tool surface (docs/history/hackathon-requirements.md §7 plus docs/product/ux-features.md), defined
  * once and served two ways:
  *   - over MCP to the user's CLI (claude / codex / gemini), see mcp/server.ts
  *   - directly to the API-key adapters, see providers/*-api.ts
  *
  * Names use underscores (`camera_orbit`), not the dots in §7 (`camera.orbit`):
  * the Anthropic and OpenAI APIs only accept [a-zA-Z0-9_-] in tool names, and
- * Claude Code exposes them as `mcp__reconstruct__camera_orbit`.
+ * Claude Code exposes them as `mcp__crashvzn__camera_orbit`.
  *
  * Every tool is view/query-only except marker_add and export_video. None can
  * change the reconstruction, the trajectories or the kinematics.
@@ -250,7 +255,7 @@ export const TOOLS: ToolDef[] = [
     name: "kinematics_query",
     title: "kinematics.query",
     description:
-      'Read one object\'s reconstructed motion at one moment from the per-frame database: position, velocity (vector), speed (m/s, mph, km/h), acceleration (negative = slowing, also in g), heading (compass), yaw_rate, forces (mass, net force and, where available, its breakdown: tyre_road = braking/accelerating/steering through the tyres, drag = air incl. wind, rolling, grade = slope, contact = the impact; plus what Gemini itself read off the footage). Time: t_s, or event + offset_s ("3 s before the crash" → event "crash_start", offset_s -3), or omit for the playhead. Doesn\'t move the playhead. This and kinematics_series are the ONLY sources for motion numbers you tell the user.',
+      'Read one object\'s reconstructed motion at one moment from the per-frame database: position, velocity (vector), speed (m/s, mph, km/h), acceleration (negative = slowing, also in g), heading (compass), yaw_rate, forces (mass, net force and, where available, its breakdown: tyre_road = braking/accelerating/steering through the tyres, drag = air incl. wind, rolling, grade = slope, contact = the impact; plus what the vision model itself read off the footage). Time: t_s, or event + offset_s ("3 s before the crash" → event "crash_start", offset_s -3), or omit for the playhead. Doesn\'t move the playhead. This and kinematics_series are the ONLY sources for motion numbers you tell the user.',
     input: z
       .object({ entity_id: z.string(), ...timeRefShape, fields: fields.default(["speed"]) })
       .refine(timeRefOk, TIME_REF_MSG),
@@ -279,7 +284,7 @@ export const TOOLS: ToolDef[] = [
     name: "crash_forces",
     title: "crash.forces",
     description:
-      "The crash in forces and momentum, for every vehicle involved: speed just before and just after the impact, change in velocity (delta-v), impulse (N·s) and the direction it pushed, average impact force over an assumed contact pulse, the slide afterwards (distance, time, mean tyre force), the closing speed, and the forces Gemini read off the footage. Use for 'how hard did they hit', 'what force hit the Toyota', 'delta-v', 'how far did it slide after'. The only source for crash-force numbers.",
+      "The crash in forces and momentum, for every vehicle involved: speed just before and just after the impact, change in velocity (delta-v), impulse (N·s) and the direction it pushed, average impact force over an assumed contact pulse, the slide afterwards (distance, time, mean tyre force), the closing speed, and the forces the vision model read off the footage. Use for 'how hard did they hit', 'what force hit the Toyota', 'delta-v', 'how far did it slide after'. The only source for crash-force numbers.",
     input: z.object({}),
     readOnly: true,
     run: (ctl) => ctl.crashForces(),
@@ -309,9 +314,9 @@ export const TOOLS: ToolDef[] = [
     name: "ui_toggle",
     title: "ui.toggle",
     description:
-      'Show or hide part of the view: "source_video" (the original footage, synced to the timeline), "trails" (vehicle paths), "frustums" (where the source cameras were), "bounds" (the scene boundary box), or "vehicle:<id>". Omit visible to flip it.',
+      'Show or hide part of the view: "source_video" (the original footage, synced to the timeline), "trails" (vehicle paths), "bounds" (the scene boundary box), or "vehicle:<id>". Omit visible to flip it.',
     input: z.object({
-      target: z.string().regex(/^(source_video|trails|frustums|bounds|vehicle:[\w-]+)$/, "source_video|trails|frustums|bounds|vehicle:<id>"),
+      target: z.string().regex(/^(source_video|trails|bounds|vehicle:[\w-]+)$/, "source_video|trails|bounds|vehicle:<id>"),
       visible: z.boolean().optional(),
     }),
     readOnly: true,

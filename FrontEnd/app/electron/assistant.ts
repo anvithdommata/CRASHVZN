@@ -11,7 +11,6 @@
  */
 import {
   AssistantSession,
-  checkAllProviders,
   createIpcSceneController,
   pickDefaultProvider,
   type Effort,
@@ -20,15 +19,16 @@ import {
   type SceneControllerMethod,
 } from "../../../packages/assistant/src/index";
 import type { BrowserWindow, IpcMain } from "electron";
+import type { ProvidersHub } from "./providers";
 
 type Choice = { provider: ProviderKind; model?: string; effort?: Effort };
 
-type Deps = { ipcMain: IpcMain; getWindow: () => BrowserWindow | null };
+type Deps = { ipcMain: IpcMain; getWindow: () => BrowserWindow | null; providers: ProvidersHub };
 
 /** Tool calls from the model should never hang the chat if the renderer reloads. */
 const SCENE_CALL_TIMEOUT_MS = 30_000;
 
-export function registerAssistant({ ipcMain, getWindow }: Deps) {
+export function registerAssistant({ ipcMain, getWindow, providers: hub }: Deps) {
   let nextCallId = 1;
   const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
 
@@ -55,7 +55,6 @@ export function registerAssistant({ ipcMain, getWindow }: Deps) {
     });
   });
 
-  let health: ProviderHealth[] | null = null;
   let session: AssistantSession | null = null;
   let starting: Promise<AssistantSession> | null = null;
   let turn = 0;
@@ -66,14 +65,21 @@ export function registerAssistant({ ipcMain, getWindow }: Deps) {
     if (win && !win.isDestroyed()) win.webContents.send("assistant:event", payload);
   };
 
-  const providers = async (refresh = false) => {
-    if (!health || refresh) health = await checkAllProviders();
-    return health;
-  };
+  const providers = (refresh = false): Promise<ProviderHealth[]> => hub.allHealth(refresh);
 
-  /** Testing default: Claude Code on the user's login, Opus at low effort. The panel can change all three. */
+  /** Default: Claude Code on the user's login, Opus at low effort, unless the Providers page / picker saved another. */
   const DEFAULT_CHOICE: Choice = { provider: "claude", model: "claude-opus-5-5", effort: "low" };
-  let choice: Choice = DEFAULT_CHOICE;
+  const saved = hub.chatDefault();
+  let choice: Choice = saved.provider
+    ? { provider: saved.provider as ProviderKind, model: saved.model || undefined, effort: (saved.effort || undefined) as Effort | undefined }
+    : DEFAULT_CHOICE;
+
+  /** Keys come from the encrypted store in the main process, read when a session (re)starts. */
+  const credentials = () => ({
+    apiKey: hub.getKey("anthropic-api"),
+    openaiApiKey: hub.getKey("openai-api"),
+    geminiApiKey: hub.getKey("gemini-api"),
+  });
 
   const start = async (opts: Partial<Choice> = {}) => {
     const next: Choice = {
@@ -88,15 +94,16 @@ export function registerAssistant({ ipcMain, getWindow }: Deps) {
         // The default provider isn't signed in; use what is, with its own default model.
         next.provider = fallback;
         if (fallback !== "anthropic-api") next.model = undefined;
+        if (!["claude", "codex", "anthropic-api", "openai-api"].includes(fallback)) next.effort = undefined;
       } else {
         const hint = all.find((item) => item.kind === next.provider)?.hint;
-        throw new Error(hint ? `That assistant isn't ready. ${hint}` : "No assistant is available. Sign in to Claude Code (`claude auth login`), Codex or Gemini.");
+        throw new Error(hint ? `That assistant isn't ready. ${hint}` : "No assistant is available. Sign in to one on the Providers page.");
       }
     }
     const same = session && choice.provider === next.provider && choice.model === next.model && choice.effort === next.effort;
     if (same) return session!;
     if (session) {
-      await session.switchProvider(next.provider, { model: next.model, effort: next.effort, apiKey: process.env.ANTHROPIC_API_KEY });
+      await session.switchProvider(next.provider, { model: next.model, effort: next.effort, ...credentials() });
       choice = next;
       return session;
     }
@@ -105,7 +112,7 @@ export function registerAssistant({ ipcMain, getWindow }: Deps) {
       provider: next.provider,
       model: next.model,
       effort: next.effort,
-      apiKey: process.env.ANTHROPIC_API_KEY,
+      ...credentials(),
     }).finally(() => {
       starting = null;
     });
@@ -119,6 +126,8 @@ export function registerAssistant({ ipcMain, getWindow }: Deps) {
   ipcMain.handle("assistant:start", async (_event, opts: Partial<Choice>) => {
     if (busy) throw new Error("Wait for the current reply to finish before switching models.");
     await start(opts ?? {});
+    // An explicit pick (chat panel or Providers page) becomes the default for next launch.
+    if (opts?.provider) hub.saveChatDefault({ provider: choice.provider, model: choice.model ?? "", effort: choice.effort ?? "" });
     return { ...choice };
   });
 
@@ -161,4 +170,5 @@ export function registerAssistant({ ipcMain, getWindow }: Deps) {
 }
 
 export { registerKinematics } from "./kinematics";
-export { registerGemini } from "./gemini";
+export { registerAnalysis } from "./analysis";
+export { registerProviders } from "./providers";

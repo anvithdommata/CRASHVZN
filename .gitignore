@@ -12,4 +12,6 @@ __pycache__/
 venv/
 
 # Step cache. The generated scene package is kept.
-pipeline/.cache/
+BackEnd/pipeline/.cache/
+# Vite dependency pre-bundle cache
+**/.vite/

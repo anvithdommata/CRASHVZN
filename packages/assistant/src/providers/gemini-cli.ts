@@ -20,17 +20,38 @@ import type { AdapterOptions, AssistantEvent, ProviderAdapter } from "./types";
  */
 export class GeminiCliAdapter implements ProviderAdapter {
   readonly kind = "gemini" as const;
-  private dir: string | null = null;
-  private child: ChildProcess | null = null;
+  /** No workspace yet, preparing one, a workspace with no turn running, or a `gemini -p` process running a turn. */
+  private state:
+    | { kind: "stopped" }
+    | { kind: "preparing"; ready: Promise<void> }
+    | { kind: "idle"; dir: string }
+    | { kind: "turn"; dir: string; child: ChildProcess } = { kind: "stopped" };
+  /** Completed turns; after the first, each turn resumes the latest Gemini session. */
   private turns = 0;
 
   constructor(private opts: AdapterOptions) {}
 
   async start(): Promise<void> {
-    if (this.dir) return;
+    if (this.state.kind === "idle" || this.state.kind === "turn") return;
+    if (this.state.kind === "preparing") return this.state.ready;
+    const ready = this.prepare().then(
+      (dir) => {
+        this.state = { kind: "idle", dir };
+      },
+      (error) => {
+        this.state = { kind: "stopped" };
+        throw error;
+      },
+    );
+    this.state = { kind: "preparing", ready };
+    return ready;
+  }
+
+  /** A temp project dir whose .gemini/settings.json allows only our MCP tools. */
+  private async prepare(): Promise<string> {
     if (!resolveCli("gemini")) throw new Error("Gemini CLI isn't installed (no `gemini` on PATH).");
-    this.dir = await mkdtemp(join(tmpdir(), "reconstruct-gemini-"));
-    await mkdir(join(this.dir, ".gemini"));
+    const dir = await mkdtemp(join(tmpdir(), "crashvzn-gemini-"));
+    await mkdir(join(dir, ".gemini"));
     const settings = {
       mcpServers: {
         [MCP_SERVER_NAME]: {
@@ -44,13 +65,16 @@ export class GeminiCliAdapter implements ProviderAdapter {
       mcp: { allowed: [MCP_SERVER_NAME] },
       telemetry: { enabled: false },
     };
-    await writeFile(join(this.dir, ".gemini", "settings.json"), JSON.stringify(settings, null, 2), { mode: 0o600 });
-    await writeFile(join(this.dir, "system.md"), this.opts.systemPrompt);
+    await writeFile(join(dir, ".gemini", "settings.json"), JSON.stringify(settings, null, 2), { mode: 0o600 });
+    await writeFile(join(dir, "system.md"), this.opts.systemPrompt);
+    return dir;
   }
 
   async *send(message: string): AsyncIterable<AssistantEvent> {
     await this.start();
-    if (this.child) throw new Error("A turn is already running; wait for it or interrupt().");
+    if (this.state.kind === "turn") throw new Error("A turn is already running; wait for it or interrupt().");
+    if (this.state.kind !== "idle") throw new Error("Gemini adapter was stopped.");
+    const { dir } = this.state;
     const cli = resolveCli("gemini")!;
     const q = new EventQueue<AssistantEvent>();
     const args = ["-p", message, "--output-format", "stream-json", "--approval-mode", "yolo"];
@@ -58,11 +82,11 @@ export class GeminiCliAdapter implements ProviderAdapter {
     if (this.opts.model) args.push("-m", this.opts.model);
 
     // Use the user's Google login, not an API key that happens to be in the environment.
-    const env: NodeJS.ProcessEnv = { ...process.env, ...this.opts.env, GEMINI_SYSTEM_MD: join(this.dir!, "system.md") };
+    const env: NodeJS.ProcessEnv = { ...process.env, ...this.opts.env, GEMINI_SYSTEM_MD: join(dir, "system.md") };
     delete env.GEMINI_API_KEY;
     delete env.GOOGLE_API_KEY;
-    const child = spawnCli(cli, args, { cwd: this.dir!, stdio: ["ignore", "pipe", "pipe"], env });
-    this.child = child;
+    const child = spawnCli(cli, args, { cwd: dir, stdio: ["ignore", "pipe", "pipe"], env });
+    this.state = { kind: "turn", dir, child };
     let stderr = "";
     let ended = false;
     child.stderr!.on("data", (d) => (stderr = (stderr + d).slice(-4000)));
@@ -95,7 +119,7 @@ export class GeminiCliAdapter implements ProviderAdapter {
       q.close();
     });
     child.on("close", (code) => {
-      this.child = null;
+      if (this.state.kind === "turn" && this.state.child === child) this.state = { kind: "idle", dir };
       this.turns++;
       if (!ended) {
         q.push(code === 0 ? { type: "done" } : { type: "error", message: `Gemini CLI exited (code ${code}). ${stderr.trim().split("\n").slice(-3).join(" ")}`.trim() });
@@ -107,13 +131,14 @@ export class GeminiCliAdapter implements ProviderAdapter {
   }
 
   async interrupt(): Promise<void> {
-    this.child?.kill();
+    if (this.state.kind === "turn") this.state.child.kill();
   }
 
   async stop(): Promise<void> {
-    this.child?.kill();
-    this.child = null;
-    if (this.dir) await rm(this.dir, { recursive: true, force: true }).catch(() => {});
-    this.dir = null;
+    if (this.state.kind === "preparing") await this.state.ready.catch(() => {});
+    const state = this.state;
+    this.state = { kind: "stopped" };
+    if (state.kind === "turn") state.child.kill();
+    if (state.kind === "idle" || state.kind === "turn") await rm(state.dir, { recursive: true, force: true }).catch(() => {});
   }
 }

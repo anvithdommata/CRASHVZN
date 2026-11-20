@@ -7,7 +7,7 @@ schema_version: "1.0.0"
 description: "Autobahn scene measured from the class boxes in demo.mp4. Includes the multi-vehicle incident on carriageway B. Along-road scale uses the configured focal length."
 
 mosaic: demo.mp4
-output: scene-packages/incident-demo
+output: BackEnd/scene-packages/incident-demo
 
 fps: 12.5
 duration_s: 59.92

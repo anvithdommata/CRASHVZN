@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import ndimage
 
-from BackEnd.pipeline.src.reconstruct.models import VehicleType
+from reconstruct.models import VehicleType
 
 _CLASS_ORDER: tuple[VehicleType, ...] = ("car", "van", "truck")
 

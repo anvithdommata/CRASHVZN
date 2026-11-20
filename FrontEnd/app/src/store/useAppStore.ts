@@ -1,7 +1,7 @@
 import { BUILTIN_SCENES, type SceneInfo } from "@/data/scenes";
-import { putSplatFile } from "@/lib/splatFiles";
+import { dropSplatFile, putSplatFile } from "@/lib/splatFiles";
 import type { FootageAnalysis } from "@/lib/analyzeFootage";
-import { CAMERA_ADJUSTMENT_BASE, type CameraAdjustments } from "@/scene/camera";
+import { CAMERA_ADJUSTMENT_BASE, FREE_CAMERA, type CameraAdjustments, type CameraMode, type CameraRequest } from "@/scene/camera";
 import { DEFAULT_ENVIRONMENT } from "@/scene/environment";
 import { getLayout } from "@/scene/layouts";
 import type { Point3 } from "@/scene/mountScene";
@@ -66,6 +66,30 @@ function savedWidth(key: string, fallback: number) {
   }
 }
 
+const HIDDEN_BUILTINS_KEY = "crashvzn.hiddenBuiltins";
+const BUILTIN_IDS = new Set(BUILTIN_SCENES.map((scene) => scene.id));
+
+/** Built-in examples the user deleted. They ship with the app, so "deleting" one only hides it. */
+function hiddenBuiltins(): string[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(HIDDEN_BUILTINS_KEY) ?? "[]");
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHiddenBuiltins(ids: string[]) {
+  try {
+    if (ids.length) localStorage.setItem(HIDDEN_BUILTINS_KEY, JSON.stringify(ids));
+    else localStorage.removeItem(HIDDEN_BUILTINS_KEY);
+  } catch {
+    // Storage unavailable: the example comes back next launch.
+  }
+}
+
+export const isBuiltinScene = (id: string) => BUILTIN_IDS.has(id);
+
 function saveWidth(key: string, value: number) {
   try {
     localStorage.setItem(key, String(Math.round(value)));
@@ -106,11 +130,9 @@ type Store = {
   search: string;
   /** Live readout of the camera relative to the scene's base view. */
   cameraAdjustments: CameraAdjustments;
-  /** Numbers typed into the camera panel; the viewport applies each new token once. */
-  cameraCommand: { adjustments: CameraAdjustments; token: number };
-  cameraResetToken: number;
-  following: string | null;
-  pov: string | null;
+  /** The latest camera instruction from the panel (number fields or Fit view); null until the first one. */
+  cameraRequest: CameraRequest | null;
+  cameraMode: CameraMode;
   layers: Layers;
   markers: Marker[];
   exportJob: ExportJob | null;
@@ -136,7 +158,7 @@ type Store = {
   applyCameraAdjustments: (adjustments: CameraAdjustments) => void;
   jumpToImpact: () => void;
   resetCamera: () => void;
-  setCameraMode: (mode: { following?: string | null; pov?: string | null }) => void;
+  setCameraMode: (mode: CameraMode) => void;
   setLayers: (patch: Partial<Layers>) => void;
   setVehicleHidden: (id: string, hidden: boolean) => void;
   addMarker: (marker: Omit<Marker, "id">) => Marker;
@@ -149,12 +171,17 @@ type Store = {
   addSplatScene: (file: { fileName: string; bytes: Uint8Array }) => void;
   /** Adds a scene to the library, or replaces the one with the same id. */
   upsertScene: (scene: SceneInfo) => void;
-  /** Progress of the current Gemini reconstruction (gemini/reconstruct.ts). */
-  geminiJob: GeminiJob;
-  setGeminiJob: (job: GeminiJob) => void;
+  /** Takes a scene out of the library (lib/deleteScene.ts also removes what's saved on disk). */
+  removeScene: (id: string) => void;
+  /** How many built-in examples are hidden, and bringing them all back. */
+  hiddenBuiltinCount: number;
+  restoreBuiltins: () => void;
+  /** Progress of the current footage analysis (incident/reconstruct.ts). */
+  analysisJob: AnalysisJob;
+  setAnalysisJob: (job: AnalysisJob) => void;
 };
 
-export type GeminiJob =
+export type AnalysisJob =
   | { state: "idle" }
   | { state: "running"; stage: string; detail?: string }
   | { state: "done"; sceneId: string; message: string }
@@ -179,7 +206,9 @@ const scenesWithDetectedCollisions = BUILTIN_SCENES.map((scene) => {
   };
 });
 
-const initial = scenesWithDetectedCollisions[0];
+const startupHidden = new Set(hiddenBuiltins());
+const visibleBuiltins = scenesWithDetectedCollisions.filter((scene) => !startupHidden.has(scene.id));
+const initial = visibleBuiltins[0] ?? scenesWithDetectedCollisions[0];
 
 function clampTime(time: number, duration: number) {
   if (!Number.isFinite(time)) return 0;
@@ -200,7 +229,8 @@ function sameCameraAdjustments(a: CameraAdjustments, b: CameraAdjustments) {
 let markerCount = 0;
 
 export const useAppStore = create<Store>((set, get) => ({
-  scenes: scenesWithDetectedCollisions,
+  scenes: visibleBuiltins,
+  hiddenBuiltinCount: scenesWithDetectedCollisions.length - visibleBuiltins.length,
   uploads: [],
   view: "home",
   homeFolder: null,
@@ -218,10 +248,8 @@ export const useAppStore = create<Store>((set, get) => ({
   resizing: false,
   search: "",
   cameraAdjustments: CAMERA_ADJUSTMENT_BASE,
-  cameraCommand: { adjustments: CAMERA_ADJUSTMENT_BASE, token: 0 },
-  cameraResetToken: 0,
-  following: null,
-  pov: null,
+  cameraRequest: null,
+  cameraMode: FREE_CAMERA,
   layers: DEFAULT_LAYERS,
   markers: [],
   exportJob: null,
@@ -242,15 +270,14 @@ export const useAppStore = create<Store>((set, get) => ({
             playing: false,
             speed: 1,
             cameraAdjustments: CAMERA_ADJUSTMENT_BASE,
-            following: null,
-            pov: null,
+            cameraMode: FREE_CAMERA,
             layers: DEFAULT_LAYERS,
             markers: [],
           }),
     });
   },
 
-  closeScene: () => set({ view: "home", playing: false, following: null, pov: null }),
+  closeScene: () => set({ view: "home", playing: false, cameraMode: FREE_CAMERA }),
 
   setHomeFolder: (homeFolder) => set({ homeFolder }),
 
@@ -296,9 +323,8 @@ export const useAppStore = create<Store>((set, get) => ({
   applyCameraAdjustments: (adjustments) =>
     set((state) => ({
       cameraAdjustments: adjustments,
-      cameraCommand: { adjustments, token: state.cameraCommand.token + 1 },
-      following: null,
-      pov: null,
+      cameraRequest: { seq: (state.cameraRequest?.seq ?? 0) + 1, kind: "adjust", adjustments },
+      cameraMode: FREE_CAMERA,
     })),
 
   jumpToImpact: () => {
@@ -309,16 +335,11 @@ export const useAppStore = create<Store>((set, get) => ({
 
   resetCamera: () =>
     set((state) => ({
-      cameraResetToken: state.cameraResetToken + 1,
-      following: null,
-      pov: null,
+      cameraRequest: { seq: (state.cameraRequest?.seq ?? 0) + 1, kind: "reset" },
+      cameraMode: FREE_CAMERA,
     })),
 
-  setCameraMode: (mode) =>
-    set((state) => ({
-      following: mode.following === undefined ? state.following : mode.following,
-      pov: mode.pov === undefined ? state.pov : mode.pov,
-    })),
+  setCameraMode: (cameraMode) => set({ cameraMode }),
 
   setLayers: (patch) => set((state) => ({ layers: { ...state.layers, ...patch } })),
 
@@ -370,8 +391,45 @@ export const useAppStore = create<Store>((set, get) => ({
         : [scene, ...state.scenes],
     })),
 
-  geminiJob: { state: "idle" },
-  setGeminiJob: (geminiJob) => set({ geminiJob }),
+  removeScene: (id) => {
+    const { scenes, selectedId } = get();
+    const remaining = scenes.filter((item) => item.id !== id);
+    if (remaining.length === scenes.length) return;
+    let hiddenBuiltinCount = get().hiddenBuiltinCount;
+    if (BUILTIN_IDS.has(id)) {
+      const hidden = [...new Set([...hiddenBuiltins(), id])];
+      saveHiddenBuiltins(hidden);
+      hiddenBuiltinCount = hidden.filter((item) => BUILTIN_IDS.has(item)).length;
+    }
+    dropSplatFile(id);
+    if (selectedId !== id) {
+      set({ scenes: remaining, hiddenBuiltinCount });
+      return;
+    }
+    // The open scene was deleted: back to the library, with the next scene loaded behind it.
+    const next = remaining[0];
+    set({
+      scenes: remaining,
+      hiddenBuiltinCount,
+      view: "home",
+      playing: false,
+      cameraMode: FREE_CAMERA,
+      markers: [],
+      ...(next
+        ? { selectedId: next.id, time: next.startTime, duration: next.duration, impactTime: next.impactTime, cameraAdjustments: CAMERA_ADJUSTMENT_BASE, layers: DEFAULT_LAYERS }
+        : { selectedId: "", time: 0, duration: 0, impactTime: null }),
+    });
+  },
+
+  restoreBuiltins: () => {
+    saveHiddenBuiltins([]);
+    const present = new Set(get().scenes.map((item) => item.id));
+    const missing = scenesWithDetectedCollisions.filter((scene) => !present.has(scene.id));
+    set((state) => ({ scenes: [...state.scenes, ...missing], hiddenBuiltinCount: 0 }));
+  },
+
+  analysisJob: { state: "idle" },
+  setAnalysisJob: (analysisJob) => set({ analysisJob }),
 
   addSplatScene: (file) => {
     const id = `splat-${crypto.randomUUID()}`;

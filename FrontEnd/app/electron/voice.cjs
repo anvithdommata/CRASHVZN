@@ -6,13 +6,13 @@
  * <userData>/voice-models. Microphone capture happens in the renderer (src/voice/), which sends
  * finished clips here as Float32Array PCM.
  *
- * Renderer API, through window.reconstruct.voice.invoke(method, ...args):
+ * Renderer API, through window.crashvzn.voice.invoke(method, ...args):
  *   status()                         -> VoiceStatus
  *   prepare()                        -> VoiceStatus once the model is downloaded, loaded and warm
  *   cancelDownload()                 -> void
  *   requestMicAccess()               -> boolean (asks macOS for microphone access; true elsewhere)
  *   transcribe(samples, sampleRate, { partial }) -> { text, discarded?, audioMs, decodeMs? }
- * Events, through window.reconstruct.voice.on(cb):
+ * Events, through window.crashvzn.voice.on(cb):
  *   { type: "status", status: VoiceStatus }
  * VoiceStatus: { phase, model: { id, label, bytes }, received, total, error? } where phase is
  *   "missing" | "downloading" | "downloaded" | "loading" | "ready" | "error".

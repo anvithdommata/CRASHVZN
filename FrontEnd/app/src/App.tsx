@@ -2,13 +2,15 @@ import { connectSceneBridge } from "@/assistant/bridge";
 import { useChatStore } from "@/assistant/chatStore";
 import { AssistantPanel } from "@/components/AssistantPanel";
 import { HomeScreen } from "@/components/HomeScreen";
+import { ProvidersPage } from "@/components/ProvidersPage";
 import { SidePanel } from "@/components/SidePanel";
 import { Timeline } from "@/components/Timeline";
 import { Viewport } from "@/components/Viewport";
-import { loadSavedGeminiScenes } from "@/gemini/reconstruct";
+import { loadSavedScenes } from "@/incident/reconstruct";
 import { syncBuiltinScenes } from "@/kinematics/store";
 import { ingestFiles } from "@/lib/ingest";
 import { useAppStore } from "@/store/useAppStore";
+import { useProvidersStore } from "@/store/useProvidersStore";
 import { useEffect, useState } from "react";
 
 const cleanIpcError = (error: unknown) =>
@@ -17,6 +19,7 @@ const cleanIpcError = (error: unknown) =>
 export default function App() {
   const [dragOver, setDragOver] = useState(false);
   const view = useAppStore((state) => state.view);
+  const providersOpen = useProvidersStore((state) => state.open);
 
   useEffect(() => {
     let depth = 0;
@@ -96,9 +99,11 @@ export default function App() {
     const disconnect = connectSceneBridge();
     // Store each preview scene's per-frame motion in MongoDB (skipped when it's unchanged).
     void syncBuiltinScenes();
-    // Gemini reconstructions saved in MongoDB come back into the library.
-    void loadSavedGeminiScenes();
-    const api = window.reconstruct?.assistant;
+    // AI reconstructions saved in MongoDB come back into the library.
+    void loadSavedScenes();
+    // Provider status for the Providers page and the "Reconstruct with …" button.
+    if (window.crashvzn?.providers) void useProvidersStore.getState().load();
+    const api = window.crashvzn?.assistant;
     if (api) {
       const chat = useChatStore.getState();
       chat.setStatus("starting");
@@ -132,6 +137,7 @@ export default function App() {
           </>
         )}
         {view === "home" && <HomeScreen dragOver={dragOver} />}
+        {providersOpen && <ProvidersPage />}
       </div>
       <AssistantPanel />
     </div>

@@ -27,6 +27,11 @@ export function resolveCli(name: string): ResolvedCli | null {
   return found;
 }
 
+/** Forget cached lookups, so a CLI installed while the app runs is found on Re-check. */
+export function clearCliCache(): void {
+  cache.clear();
+}
+
 function findOnPath(name: string): ResolvedCli | null {
   const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
   const isWin = process.platform === "win32";
@@ -56,9 +61,17 @@ function readNpmShim(cmdPath: string): ResolvedCli | null {
   } catch {
     return null;
   }
+  const dir = dirname(cmdPath);
+  // Some npm packages ship a native binary and the shim runs it directly (OpenCode 2:
+  // `"%dp0%\node_modules\@opencode\cli\bin\opencode.exe" %*`). Spawn that .exe as is.
+  // Skip the `"%dp0%\node.exe"` interpreter check that JS shims start with.
+  const exe = text.match(/"%dp0%\\?\\((?!node\.exe")[^"]+\.exe)"/i);
+  if (exe && !/"%dp0%\\[^"]+\.(?:js|cjs|mjs)"/i.test(text)) {
+    const bin = join(dir, exe[1]!);
+    return existsSync(bin) ? { command: bin, prefixArgs: [], path: cmdPath } : null;
+  }
   const m = text.match(/"%dp0%\\([^"]+\.(?:js|cjs|mjs))"/i);
   if (!m) return null;
-  const dir = dirname(cmdPath);
   const script = join(dir, m[1]!);
   if (!existsSync(script)) return null;
   const localNode = join(dir, "node.exe");
@@ -74,9 +87,10 @@ export function runCli(
   cli: ResolvedCli,
   args: string[],
   timeoutMs = 10_000,
+  env?: NodeJS.ProcessEnv,
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawnCli(cli, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawnCli(cli, args, { stdio: ["ignore", "pipe", "pipe"], ...(env ? { env } : {}) });
     let stdout = "";
     let stderr = "";
     child.stdout!.on("data", (d) => (stdout += d));

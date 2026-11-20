@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { generateVision, samplePlan, strictSchema, visionPreflight } from "../electron/codex-vision";
-import { PASS1_SCHEMA, sanitizeSpec } from "../src/gemini/spec";
-import { buildGeminiScene } from "../src/gemini/engine";
+import { PASS1_SCHEMA, sanitizeSpec } from "../src/incident/spec";
+import { buildIncidentScene } from "../src/incident/engine";
 import { makeVehicle } from "../src/scene/cars";
 import * as THREE from "three";
 
@@ -35,14 +35,14 @@ if (process.argv.includes("--live") || process.argv.includes("--full")) {
   const full = process.argv.includes("--full");
   const status = await visionPreflight();
   assert.ok(status.ok, JSON.stringify(status));
-  const instructions = await readFile(resolve("FrontEnd/app/electron/gemini-skill/SKILL.md"), "utf8");
+  const instructions = await readFile(resolve("FrontEnd/app/electron/vision-prompts/SKILL.md"), "utf8");
   const answer = await generateVision([
     { text: "Video 1: demo.mp4. Measure the supplied footage from the highway camera mosaic. Produce a scene with visible road vehicles, their colours, estimated dimensions and at least two position keyframes for each vehicle. All times must use the source-video timestamps in the image manifest. Report total source duration as 60 seconds. Do not invent a collision when the images do not establish contact." },
     { fileData: { fileUri: resolve("demo.mp4") }, videoMetadata: { startOffset: full ? "0s" : "20s", endOffset: full ? "59.92s" : "24s", fps: 2, duration: 60 } },
   ], PASS1_SCHEMA, instructions, console.log);
   const spec = sanitizeSpec(answer.json);
   assert.ok(spec.objects.length > 0, "vision must find vehicles");
-  const built = buildGeminiScene({ id: "codex-auth-smoke", spec, seed: 42, created: "2026-11-15" });
+  const built = buildIncidentScene({ id: "codex-auth-smoke", spec, seed: 42, created: "2026-11-15" });
   assert.ok(built.scene.vehicles.length > 0, "engine must retain renderable vehicles");
   assert.equal(built.scene.vehicles.length, built.layout.vehicles.length);
   for (const vehicle of built.layout.vehicles) {

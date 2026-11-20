@@ -1,7 +1,22 @@
+/**
+ * Electron main process entry. It owns the window and three groups of IPC handlers:
+ *   - footage:stage and export:save, defined here (copying source videos, saving exported clips);
+ *   - everything in electron/assistant.bundle.cjs (built by `npm run build:assistant` from
+ *     electron/assistant.ts): the Providers page backend, the chat assistant and its MCP server,
+ *     the MongoDB kinematics store, and the vision pipeline (analysis.ts);
+ *   - stand-ins that fail politely when the bundle hasn't been built.
+ * The renderer reaches all of it through window.crashvzn (electron/preload.cjs). Changes here or in
+ * the bundle need an Electron restart; Vite only hot-reloads the renderer.
+ */
 const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+
+// Electron names the user-data folder after package.json "name". The package was renamed from
+// "reconstruct-viewer" to "crashvzn-app"; keep the old folder so the embedded MongoDB, saved
+// scenes, provider keys, settings and voice models stay where they are. Must run before "ready".
+app.setPath("userData", path.join(app.getPath("appData"), "reconstruct-viewer"));
 
 const isDev = !app.isPackaged;
 const videoExtensions = new Set([".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm"]);
@@ -16,6 +31,7 @@ function hashFile(filePath) {
   });
 }
 
+/** Copies the queued source videos into <userData>/incidents/<uuid>/sources and writes a manifest of names, sizes and SHA-256 hashes. */
 ipcMain.handle("footage:stage", async (_event, filePaths) => {
   if (!Array.isArray(filePaths) || filePaths.length === 0) {
     throw new Error("Select at least one video file.");
@@ -79,8 +95,9 @@ ipcMain.handle("footage:stage", async (_event, filePaths) => {
 
 let mainWindow = null;
 
-// GEMINI_API_KEY (scene reading from footage, and an assistant fallback) and ANTHROPIC_API_KEY
-// live in the gitignored packages/assistant/.env during development.
+// Development only: API keys for the chat fallbacks (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY)
+// may live in the gitignored packages/assistant/.env. Keys saved on the Providers page take their place
+// in the packaged app. Video processing never uses API keys.
 if (isDev) {
   try {
     process.loadEnvFile(path.join(__dirname, "../../../packages/assistant/.env"));
@@ -89,18 +106,25 @@ if (isDev) {
   }
 }
 
+// Handles to the bundle's services, disposed on quit (null if the bundle failed to load).
 let assistant = null;
 let kinematics = null;
+let providers = null;
 try {
   const bundle = require("./assistant.bundle.cjs");
-  assistant = bundle.registerAssistant({ ipcMain, getWindow: () => mainWindow });
+  // Providers page: settings, encrypted API keys, provider status and sign-in (electron/providers.ts).
+  providers = bundle.registerProviders({ ipcMain, getWindow: () => mainWindow });
+  assistant = bundle.registerAssistant({ ipcMain, getWindow: () => mainWindow, providers });
   kinematics = bundle.registerKinematics({ ipcMain, app });
-  // Gemini reads the footage; its analyses and scenes live in the same MongoDB as the kinematics.
-  bundle.registerGemini({
+  // The vision pipeline (analysis.ts) reads the footage; its analyses and scenes live in the same MongoDB as the kinematics.
+  bundle.registerAnalysis({
     ipcMain,
     getWindow: () => mainWindow,
     db: kinematics.db,
-    cacheDir: path.join(app.getPath("userData"), "gemini-tiles"),
+    cacheDir: path.join(app.getPath("userData"), "camera-tiles"),
+    forgetKinematics: kinematics.forget,
+    // Codex (ChatGPT login) or Claude Code (Claude subscription), as chosen on the Providers page.
+    getProcessor: () => providers.processor(),
   });
 } catch (error) {
   console.error("Assistant failed to load. Run `npm run build:assistant`.", error);
@@ -111,12 +135,19 @@ try {
   ipcMain.handle("assistant:start", unavailable);
   ipcMain.handle("assistant:send", unavailable);
   ipcMain.handle("assistant:interrupt", async () => {});
-  ipcMain.handle("gemini:status", async () => ({ configured: false, models: { fast: "", precise: "" } }));
-  ipcMain.handle("gemini:analyze", unavailable);
-  ipcMain.handle("gemini:save-scene", unavailable);
-  ipcMain.handle("gemini:list-scenes", async () => []);
+  ipcMain.handle("analysis:status", async () => ({ configured: false, models: { fast: "", precise: "" } }));
+  ipcMain.handle("analysis:analyze", unavailable);
+  ipcMain.handle("analysis:save-scene", unavailable);
+  ipcMain.handle("analysis:list-scenes", async () => []);
+  // Nothing is saved without the bundle, so there is nothing to delete.
+  ipcMain.handle("analysis:delete-scene", async () => {});
+  ipcMain.handle("providers:status", unavailable);
+  for (const channel of ["providers:check", "providers:login", "providers:cancel-login", "providers:open-terminal", "providers:open-url", "providers:set-key", "providers:clear-key", "providers:set-processor"]) {
+    ipcMain.handle(channel, unavailable);
+  }
 }
 
+/** Asks where to save an exported video (MP4 or WebM from src/lib/exportVideo.ts) and writes it there. */
 ipcMain.handle("export:save", async (_event, bytes, fileName) => {
   if (!(bytes instanceof Uint8Array) || typeof fileName !== "string") throw new Error("Nothing to save.");
   const safeName = path.basename(fileName).replace(/[<>:"/\|?*\x00-\x1f]/g, "_") || "reconstruction.mp4";
@@ -143,7 +174,7 @@ function createWindow() {
     height: 920,
     minWidth: 1100,
     minHeight: 720,
-    title: "Reconstruct",
+    title: "CRASHVZN",
     backgroundColor: "#0a2378",
     autoHideMenuBar: true,
     webPreferences: {
@@ -179,7 +210,7 @@ app.on("before-quit", (event) => {
   quitting = true;
   event.preventDefault();
   const timeout = new Promise((resolve) => setTimeout(resolve, 5000));
-  void Promise.race([Promise.allSettled([assistant?.dispose(), kinematics?.dispose()]), timeout]).finally(() => app.quit());
+  void Promise.race([Promise.allSettled([assistant?.dispose(), kinematics?.dispose(), providers?.dispose()]), timeout]).finally(() => app.quit());
 });
 
 app.on("window-all-closed", () => {

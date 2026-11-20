@@ -3,7 +3,7 @@
 The site resolves downloads in this order:
 
 1. `VITE_DOWNLOAD_URL_MAC`, `VITE_DOWNLOAD_URL_WIN`, or `VITE_DOWNLOAD_URL_LINUX` from the build environment.
-2. A matching asset on the latest GitHub Release for `VITE_GITHUB_REPO` (default: `AarnavKannan/sunhacks`).
+2. A matching asset on the latest GitHub Release for `VITE_GITHUB_REPO` (default: `anvithdommata/CRASHVZN`).
 3. The repository's releases page.
 
 To host installers yourself, drop them in this folder and set the matching env var, for example:

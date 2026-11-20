@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
-import { planMotion, trackAt } from "../../../../src/gemini/motion.ts";
-import { sanitizeSpec, type IncidentSpec } from "../../../../src/gemini/spec.ts";
+import { planMotion, trackAt } from "../../../../src/incident/motion.ts";
+import { sanitizeSpec, type IncidentSpec } from "../../../../src/incident/spec.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const path = process.argv[2] ?? join(here, "..", "..", "incident-spec.json");
@@ -20,7 +20,7 @@ const fail = (m: string) => {
 };
 
 t0 = performance.now();
-const plan = planMotion(spec, { seed: 1, friction: { mu: 0.8, range: [0.7, 0.9] } });
+const plan = planMotion(spec);
 console.log(`planMotion ${(performance.now() - t0).toFixed(0)} ms; planned ${plan.vehicles.length}, removed ${plan.removed.length}`);
 
 // Frame exactness: at every video frame the planned pose equals the measured keyframe.
@@ -41,11 +41,11 @@ if (worst > 0.05) fail("planned poses don't hit the keyframes");
 
 // The full scene build (road, models, layout) and the kinematics derivation the app stores.
 try {
-  const { buildGeminiScene } = await import("../../../../src/gemini/engine.ts");
+  const { buildIncidentScene } = await import("../../../../src/incident/engine.ts");
   const { deriveSceneKinematics } = await import("../../../../src/kinematics/derive.ts");
   t0 = performance.now();
-  const built = buildGeminiScene({ id: "measured-check", spec, seed: 1, created: new Date().toISOString() });
-  console.log(`buildGeminiScene ${(performance.now() - t0).toFixed(0)} ms; scene ${built.scene.vehicles.length} vehicles, duration ${built.scene.duration}, impact ${built.scene.impactTime}, removed ${JSON.stringify(built.report.removed.map((r) => `${r.id}: ${r.reason}`))}`);
+  const built = buildIncidentScene({ id: "measured-check", spec, seed: 1, created: new Date().toISOString() });
+  console.log(`buildIncidentScene ${(performance.now() - t0).toFixed(0)} ms; scene ${built.scene.vehicles.length} vehicles, duration ${built.scene.duration}, impact ${built.scene.impactTime}, removed ${JSON.stringify(built.report.removed.map((r) => `${r.id}: ${r.reason}`))}`);
   t0 = performance.now();
   const kin = deriveSceneKinematics(built.scene);
   console.log(`deriveSceneKinematics ${(performance.now() - t0).toFixed(0)} ms; ${kin?.frames.length ?? 0} frame rows`);

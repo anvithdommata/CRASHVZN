@@ -18,8 +18,10 @@
  *   frames     { incident_id, entity_id, t, frame, position, velocity, speed, accel, accel_long,
  *                heading_deg, yaw_rate_dps, mass_kg, force_net, force_parts, force_reported,
  *                involvement, sigma }
- *   analyses   Gemini's reading of uploaded footage (electron/gemini.ts)
- *   scenes     Gemini scenes in the library: analysis id + seed, rebuilt by the engine at startup
+ *   analyses   The vision model's reading of uploaded footage (electron/analysis.ts; legacy name)
+ *   scenes     Reconstructed scenes in the library: analysis id + seed, rebuilt by the engine at startup
+ * Frames are stored at the renderer's derivation rate (src/kinematics/derive.ts FPS = 30), not the
+ * source video's frame rate. See docs/kinematics-database.md.
  * The tracking pipeline's real output (tracks.json) is meant to be loaded through the same
  * sync call, with `sigma` filled in and basis "tracked from the footage".
  */
@@ -50,7 +52,7 @@ export type FrameDoc = {
   force_net: Vec3;
   /** force_net split into tyre/road, air drag, rolling resistance, slope and impact (sums to force_net). */
   force_parts?: { tyre_road: Vec3; drag: Vec3; rolling: Vec3; grade: Vec3; contact: Vec3 };
-  /** Gemini's own force reading near this time. */
+  /** The vision model's own force reading near this time. */
   force_reported?: { vector: Vec3; cause: string; note: string } | null;
   involvement?: "crash" | "background";
   sigma: { position_m?: number; speed_mps?: number; accel_mps2?: number } | null;
@@ -214,8 +216,31 @@ export function registerKinematics({ ipcMain, app }: { ipcMain: IpcMain; app: Ap
 
   ipcMain.handle("kinematics:status", async () => status);
 
+  /**
+   * The write running (or last queued) per incident. Writes to one incident run one after another:
+   * a sync deletes the incident's frames and re-inserts them, so two overlapping syncs would collide
+   * on the unique (incident, entity, t) index. React StrictMode's double-run of startup effects did
+   * exactly that when restoring saved scenes; the queued sync then sees the same hash and skips.
+   * Deleting an incident goes through the same queue, so a sync still in flight can't re-insert
+   * frames after the delete.
+   */
+  const writeQueue = new Map<string, Promise<unknown>>();
+  const enqueue = <T>(incidentId: string, work: () => Promise<T>): Promise<T> => {
+    const previous = writeQueue.get(incidentId) ?? Promise.resolve();
+    const job = previous.catch(() => undefined).then(work);
+    writeQueue.set(incidentId, job);
+    void job.finally(() => {
+      if (writeQueue.get(incidentId) === job) writeQueue.delete(incidentId);
+    }).catch(() => {});
+    return job;
+  };
+
   /** Replaces an incident's frames unless the stored copy has the same content hash. */
-  ipcMain.handle("kinematics:sync", async (_event, meta: Omit<IncidentDoc, "synced_at">, rows: FrameDoc[]) => {
+  ipcMain.handle("kinematics:sync", (_event, meta: Omit<IncidentDoc, "synced_at">, rows: FrameDoc[]) =>
+    enqueue(meta._id, () => syncIncident(meta, rows)),
+  );
+
+  const syncIncident = async (meta: Omit<IncidentDoc, "synced_at">, rows: FrameDoc[]) => {
     const incidentCol = await incidents();
     const existing = await incidentCol.findOne({ _id: meta._id }, { projection: { hash: 1 } });
     if (existing?.hash === meta.hash) return { synced: false, frames: 0 };
@@ -227,7 +252,7 @@ export function registerKinematics({ ipcMain, app }: { ipcMain: IpcMain; app: Ap
     }
     await incidentCol.replaceOne({ _id: meta._id }, { ...meta, synced_at: new Date() }, { upsert: true, writeConcern: { j: true } });
     return { synced: true, frames: rows.length };
-  });
+  };
 
   ipcMain.handle("kinematics:incident", async (_event, incidentId: string) => requireIncident(incidentId));
 
@@ -256,8 +281,14 @@ export function registerKinematics({ ipcMain, app }: { ipcMain: IpcMain; app: Ap
   });
 
   return {
-    /** The database, for the Gemini module's analyses and scenes collections. */
+    /** The database, for the vision pipeline's (electron/analysis.ts) analyses and scenes collections. */
     db: () => ready,
+    /** Removes an incident's frames and its incidents doc, after any sync of it still in flight. */
+    forget: (incidentId: string) =>
+      enqueue(incidentId, async () => {
+        await (await frames()).deleteMany({ incident_id: incidentId });
+        await (await incidents()).deleteOne({ _id: incidentId });
+      }),
     dispose: async () => {
       try {
         // Flush to disk before the embedded server stops, so nothing is lost on Windows.

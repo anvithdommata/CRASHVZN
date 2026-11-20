@@ -12,7 +12,7 @@ import {
   type SceneEnvironment,
 } from "@/scene/environment";
 import { getLayout, type Layout, type Pose } from "@/scene/layouts";
-import { type CameraAdjustments } from "@/scene/camera";
+import { FREE_CAMERA, type CameraAdjustments, type CameraMode } from "@/scene/camera";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
@@ -53,10 +53,8 @@ export type SceneHandle = {
   bounds: () => ViewBounds;
   /** Where a vehicle's centre is at `time`, or null if the scene has no such vehicle. */
   vehiclePose: (id: string, time: number) => { position: Point3; yaw: number; /** Not in the scene at this time. */ hidden?: boolean } | null;
-  /** Keep a vehicle centred from outside (null stops). */
-  setFollow: (id: string | null) => void;
-  /** Ride along from a vehicle's approximate driver eye point (null leaves). */
-  setPov: (id: string | null) => void;
+  /** Free camera, follow a vehicle from outside, or ride in its driver seat (see CameraMode). */
+  setMode: (mode: CameraMode) => void;
   setLayers: (layers: SceneLayers) => void;
   setMarkers: (markers: SceneMarker[]) => void;
   /** Called after every rendered frame, while the frame is still in the canvas (used by export). */
@@ -243,8 +241,9 @@ export async function mountScene(
   let layers: SceneLayers = { trails: false, bounds: true, hitboxes: false, hiddenVehicles: [] };
   let markers: SceneMarker[] = [];
   let markerObjects = new Map<string, THREE.Group>();
-  let follow: string | null = null;
-  let pov: string | null = null;
+  let mode: CameraMode = FREE_CAMERA;
+  /** True for the vehicle the POV camera sits in (it is hidden so it doesn't block the view). */
+  const ridingIn = (id: string) => mode.kind === "pov" && mode.entityId === id;
   let lastTime = 0;
   let frameCallback: ((canvas: HTMLCanvasElement) => void) | null = null;
   let tween: {
@@ -528,7 +527,7 @@ export async function mountScene(
 
   const applyVehicleVisibility = () => {
     for (const mover of movers) {
-      mover.rig.root.visible = !mover.poseAt(lastTime).hidden && !layers.hiddenVehicles.includes(mover.id) && pov !== mover.id;
+      mover.rig.root.visible = !mover.poseAt(lastTime).hidden && !layers.hiddenVehicles.includes(mover.id) && !ridingIn(mover.id);
       const hitbox = mover.rig.root.getObjectByName("vehicle-hitbox");
       if (hitbox) hitbox.visible = layers.hitboxes;
     }
@@ -593,9 +592,9 @@ export async function mountScene(
   };
 
   const leaveCameraModes = () => {
-    follow = null;
-    if (pov) {
-      pov = null;
+    const wasPov = mode.kind === "pov";
+    mode = FREE_CAMERA;
+    if (wasPov) {
       controls.enabled = true;
       applyVehicleVisibility();
     }
@@ -673,7 +672,7 @@ export async function mountScene(
       const pose = mover.poseAt(time);
       mover.rig.root.position.set(pose.x, 0, pose.z);
       mover.rig.root.rotation.y = pose.yaw;
-      mover.rig.root.visible = !pose.hidden && !layers.hiddenVehicles.includes(mover.id) && pov !== mover.id;
+      mover.rig.root.visible = !pose.hidden && !layers.hiddenVehicles.includes(mover.id) && !ridingIn(mover.id);
 
       // Motion state from the trajectory itself, so any poseAt (scripted now, simulated
       // or tracked later) drives wheels, brake lights and suspension consistently.
@@ -691,7 +690,8 @@ export async function mountScene(
 
   /** Keeps the followed vehicle at the orbit centre, carrying the camera along with it. */
   const updateFollow = () => {
-    const mover = follow ? movers.find((item) => item.id === follow) : undefined;
+    const current = mode;
+    const mover = current.kind === "follow" ? movers.find((item) => item.id === current.entityId) : undefined;
     if (!mover) return;
     const point = followPoint(mover);
     const delta = point.clone().sub(tween ? tween.toTarget : controls.target);
@@ -706,7 +706,8 @@ export async function mountScene(
   };
 
   const updatePov = () => {
-    const mover = pov ? movers.find((item) => item.id === pov) : undefined;
+    const current = mode;
+    const mover = current.kind === "pov" ? movers.find((item) => item.id === current.entityId) : undefined;
     if (!mover) return;
     const yaw = mover.rig.root.rotation.y;
     const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
@@ -745,7 +746,7 @@ export async function mountScene(
       return { position: toPoint(camera.position), target: toPoint(controls.target) };
     },
     setCamera: (pose, options = {}) => {
-      if (pov) leaveCameraModes();
+      if (mode.kind === "pov") leaveCameraModes();
       const placed = constrain(toVector(pose.position), toVector(pose.target));
       if (options.fovDeg && Math.abs(camera.fov - options.fovDeg) > 1e-9) {
         camera.fov = THREE.MathUtils.clamp(options.fovDeg, 1, 120);
@@ -763,18 +764,15 @@ export async function mountScene(
       const pose = mover.poseAt(time);
       return { position: [pose.x, 0, pose.z], yaw: pose.yaw, ...(pose.hidden ? { hidden: true } : {}) };
     },
-    setFollow: (id) => {
-      if (id && pov) leaveCameraModes();
-      follow = id;
-    },
-    setPov: (id) => {
-      if (!id) {
+    setMode: (next) => {
+      if (next.kind !== "pov") {
+        // Free or follow: the user's controls are live again.
         leaveCameraModes();
+        mode = next;
         return;
       }
-      follow = null;
       stopMotion();
-      pov = id;
+      mode = next;
       controls.enabled = false;
       applyVehicleVisibility();
     },
@@ -792,10 +790,10 @@ export async function mountScene(
     render: () => {
       if (disposed) return;
       const now = performance.now();
-      if (pov) {
+      if (mode.kind === "pov") {
         updatePov();
       } else {
-        if (follow) updateFollow();
+        if (mode.kind === "follow") updateFollow();
         stepTween(now);
         controls.update();
         clampToBounds(camera.position);

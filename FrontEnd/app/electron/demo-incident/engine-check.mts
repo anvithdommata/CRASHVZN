@@ -5,8 +5,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { planMotion, trackAt } from "../../src/gemini/motion.ts";
-import { sanitizeSpec, type IncidentSpec } from "../../src/gemini/spec.ts";
+import { planMotion, trackAt } from "../../src/incident/motion.ts";
+import { sanitizeSpec, type IncidentSpec } from "../../src/incident/spec.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const raw: IncidentSpec = JSON.parse(readFileSync(join(here, "incident-spec.json"), "utf8"));
@@ -72,7 +72,7 @@ const centres = (l: number[]) => l.slice(1).map((t, i) => (t + l[i]) / 2);
 const fl = s.road.lane_lines_forward_m;
 const bl = s.road.lane_lines_backward_m;
 const lanes = fl && bl ? { forward: centres(fl).map((o) => -o), backward: centres(bl) } : undefined;
-const plan = planMotion(s, { seed: 1, friction: { mu: 0.8, range: [0.7, 0.9] }, lanes });
+const plan = planMotion(s, { lanes });
 console.log(`planned ${plan.vehicles.length}, removed ${plan.removed.length}; crash ${JSON.stringify(plan.crash)}`);
 if (plan.vehicles.length !== s.objects.length || plan.removed.length) fail(`engine removed: ${JSON.stringify(plan.removed)}`);
 for (const id of s.crash?.participants ?? []) {

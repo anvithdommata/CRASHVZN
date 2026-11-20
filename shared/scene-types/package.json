@@ -1,7 +1,0 @@
-{
-  "name": "@reconstruct/scene-types",
-  "version": "0.1.0",
-  "private": true,
-  "types": "index.ts",
-  "description": "Scene package types for the Electron app and MCP tools."
-}

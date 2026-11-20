@@ -31,10 +31,10 @@ app.whenReady().then(async () => {
     if (spec.spec && spec.spec.objects) spec = spec.spec;
     const js = await build({
       stdin: { contents: `
-        import { buildGeminiScene } from "./src/gemini/engine";
+        import { buildIncidentScene } from "./src/incident/engine";
         import { mountScene } from "./src/scene/mountScene";
         (async () => {
-          const built = buildGeminiScene({ id: "a2-median", spec: ${JSON.stringify(spec)}, seed: 42, created: "2026-11-15" });
+          const built = buildIncidentScene({ id: "a2-median", spec: ${JSON.stringify(spec)}, seed: 42, created: "2026-11-15" });
           const viewer = await mountScene(document.getElementById("view"), () => {});
           viewer.showProxy(built.layout.id, built.scene.vehicles, built.scene.environment, built.scene.duration);
           await new Promise((r) => setTimeout(r, 2500));

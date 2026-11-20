@@ -150,7 +150,7 @@ export interface KinematicsReading {
      * resistance; grade = the slope; contact = the impact itself (only during the crash period).
      */
     parts?: Record<"tyre_road" | "drag" | "rolling" | "grade" | "contact", { vector: Vec3; magnitude: Quantity }>;
-    /** What Gemini read off the footage near this moment (its own estimate, for comparison). */
+    /** What the vision model read off the footage near this moment (its own estimate, for comparison). */
     reported?: { vector: Vec3; magnitude: Quantity; cause: string; note: string };
     /** Which effects the model includes, e.g. "net only; drag and friction not modeled". */
     model: string;
@@ -191,8 +191,8 @@ export interface CrashForces {
     average_force: { magnitude: Quantity; pulse_s: number; g: number };
     /** From first contact until it stopped (or the crash ended): distance, time, mean tyre/road force. */
     slide: { distance: { m: number; ft: number }; duration_s: number; mean_tyre_force: Quantity };
-    /** Gemini's own force readings during the crash period, for comparison. */
-    reported_by_gemini: { t_s: number; cause: string; magnitude: Quantity; note: string }[];
+    /** The vision model's own force readings during the crash period, for comparison. */
+    reported_by_model: { t_s: number; cause: string; magnitude: Quantity; note: string }[];
   }[];
   basis?: string;
   /** What the numbers can and can't support. */
@@ -244,8 +244,8 @@ export const CAMERA_PRESETS = {
 export type CameraPreset = keyof typeof CAMERA_PRESETS;
 export const CAMERA_PRESET_NAMES = Object.keys(CAMERA_PRESETS) as [CameraPreset, ...CameraPreset[]];
 
-/** `trails | frustums | source_video | bounds | vehicle:<id>` */
-export type ToggleTarget = "trails" | "frustums" | "source_video" | "bounds" | `vehicle:${string}`;
+/** `trails | source_video | bounds | vehicle:<id>` */
+export type ToggleTarget = "trails" | "source_video" | "bounds" | `vehicle:${string}`;
 
 export type SeekRequest = TimeRef | { relative_s: number };
 

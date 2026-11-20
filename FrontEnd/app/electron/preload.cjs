@@ -7,7 +7,7 @@ function listen(channel, callback) {
   return () => ipcRenderer.removeListener(channel, handler);
 }
 
-contextBridge.exposeInMainWorld("reconstruct", {
+contextBridge.exposeInMainWorld("crashvzn", {
   isDesktop: true,
   stageVideos: (files) => {
     const paths = files.map((file) => webUtils.getPathForFile(file));
@@ -22,6 +22,24 @@ contextBridge.exposeInMainWorld("reconstruct", {
     send: (text) => ipcRenderer.invoke("assistant:send", text),
     interrupt: () => ipcRenderer.invoke("assistant:interrupt"),
     onEvent: (callback) => listen("assistant:event", callback),
+  },
+
+  /**
+   * Providers page (electron/providers.ts). API keys go in, but only "stored / not stored" ever
+   * comes back: key values stay in the main process.
+   */
+  providers: {
+    status: (refresh) => ipcRenderer.invoke("providers:status", Boolean(refresh)),
+    check: (kind) => ipcRenderer.invoke("providers:check", kind),
+    login: (kind) => ipcRenderer.invoke("providers:login", kind),
+    cancelLogin: (kind) => ipcRenderer.invoke("providers:cancel-login", kind),
+    openTerminal: (kind, purpose) => ipcRenderer.invoke("providers:open-terminal", kind, purpose ?? "login"),
+    openUrl: (url) => ipcRenderer.invoke("providers:open-url", url),
+    setKey: (kind, value) => ipcRenderer.invoke("providers:set-key", kind, value),
+    clearKey: (kind) => ipcRenderer.invoke("providers:clear-key", kind),
+    setProcessor: (choice) => ipcRenderer.invoke("providers:set-processor", choice),
+    onLoginEvent: (callback) => listen("providers:login-event", callback),
+    onChanged: (callback) => listen("providers:changed", callback),
   },
 
   /**
@@ -42,13 +60,14 @@ contextBridge.exposeInMainWorld("reconstruct", {
     positions: (incidentId, t) => ipcRenderer.invoke("kinematics:positions", incidentId, t),
   },
 
-  /** Gemini scene reading (electron/gemini.ts). The API key never reaches the renderer. */
-  gemini: {
-    status: () => ipcRenderer.invoke("gemini:status"),
-    analyze: (files, opts) => ipcRenderer.invoke("gemini:analyze", files.map((file) => webUtils.getPathForFile(file)), opts ?? {}),
-    saveScene: (record) => ipcRenderer.invoke("gemini:save-scene", record),
-    listScenes: () => ipcRenderer.invoke("gemini:list-scenes"),
-    onProgress: (callback) => listen("gemini:progress", callback),
+  /** Video processing (electron/analysis.ts, legacy name): Codex or Claude Code, picked on the Providers page. */
+  analysis: {
+    status: () => ipcRenderer.invoke("analysis:status"),
+    analyze: (files, opts) => ipcRenderer.invoke("analysis:analyze", files.map((file) => webUtils.getPathForFile(file)), opts ?? {}),
+    saveScene: (record) => ipcRenderer.invoke("analysis:save-scene", record),
+    listScenes: () => ipcRenderer.invoke("analysis:list-scenes"),
+    deleteScene: (sceneId) => ipcRenderer.invoke("analysis:delete-scene", sceneId),
+    onProgress: (callback) => listen("analysis:progress", callback),
   },
 
   /** Saves an exported video; returns the saved path. */

@@ -13,9 +13,9 @@ const columns = [
   {
     title: "Project",
     links: [
-      { label: "GitHub", href: "https://github.com/AarnavKannan/sunhacks" },
-      { label: "Releases", href: "https://github.com/AarnavKannan/sunhacks/releases" },
-      { label: "Credits", href: "https://github.com/AarnavKannan/sunhacks/blob/main/CREDITS.md" },
+      { label: "GitHub", href: "https://github.com/anvithdommata/CRASHVZN" },
+      { label: "Releases", href: "https://github.com/anvithdommata/CRASHVZN/releases" },
+      { label: "Credits", href: "https://github.com/anvithdommata/CRASHVZN/blob/main/CREDITS.md" },
     ],
   },
   {
@@ -74,7 +74,7 @@ export function Footer() {
             Reconstruction estimates only. Not a substitute for a certified forensic investigation.
           </span>
           <div className="footer-bottom-right">
-            <a href="https://github.com/AarnavKannan/sunhacks" target="_blank" rel="noreferrer">
+            <a href="https://github.com/anvithdommata/CRASHVZN" target="_blank" rel="noreferrer">
               <Github size={13} /> Source
             </a>
           </div>

@@ -13,3 +13,7 @@ const SPLAT_EXT = /\.(spz|ply|splat|ksplat|sog|zip)$/i;
 export function isSplatFile(name: string) {
   return SPLAT_EXT.test(name);
 }
+
+export function dropSplatFile(id: string) {
+  files.delete(id);
+}

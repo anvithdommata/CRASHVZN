@@ -1,5 +1,5 @@
 import type { SceneEnvironment } from "@/scene/environment";
-import r05FootageUrl from "../../../../TestData/r05_s03_labels_visualization.mp4?url";
+import r05FootageUrl from "../../../../demo.mp4?url";
 
 export type VehicleInfo = {
   id: string;
@@ -50,7 +50,7 @@ export type SceneInfo = {
   basis?: string;
   /** Road and air for the force breakdown: wind (scene frame, m/s), grade (%), surface and friction. */
   physics?: { wind: [number, number, number]; gradePercent: number; surface: string; mu: number };
-  /** Forces Gemini read off the footage per vehicle (scene frame, N), stored next to the derived ones. */
+  /** Forces the vision model read off the footage per vehicle (scene frame, N), stored next to the derived ones. */
   reportedForces?: Record<string, { t: number; force: [number, number, number]; cause: string; note: string }[]>;
 };
 

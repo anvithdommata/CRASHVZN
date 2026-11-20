@@ -1,6 +1,8 @@
 /**
- * Per-frame kinematics for the built-in preview scenes, derived from their scripted
- * trajectories (scene/layouts.ts) and stored in MongoDB like real tracking output would be.
+ * Per-frame kinematics for every proxy scene (built-in previews, LLM reconstructions and the
+ * prepared measured demo), derived from the layout's poseAt() trajectories (scene/layouts.ts,
+ * registered by incident/engine.ts) at FPS and stored in MongoDB (electron/kinematics.ts).
+ * The `frame` field is an index at FPS, not a source-video frame. See docs/kinematics-database.md.
  *
  * Everything is in the assistant's world frame: meters, +x east, +y up, -z north, origin at
  * the crash point (the midpoint of the vehicles involved at crash start).
@@ -344,7 +346,7 @@ function addStatics(
   return contacts;
 }
 
-/** Gemini's own force reading nearest this time (within a quarter second), if any. */
+/** The vision model's own force reading nearest this time (within a quarter second), if any. */
 function reportedAt(samples: NonNullable<SceneInfo["reportedForces"]>[string], t: number): KinematicsFrame["force_reported"] {
   let best: (typeof samples)[number] | null = null;
   for (const sample of samples) if (Math.abs(sample.t - t) <= 0.25 && (!best || Math.abs(sample.t - t) < Math.abs(best.t - t))) best = sample;

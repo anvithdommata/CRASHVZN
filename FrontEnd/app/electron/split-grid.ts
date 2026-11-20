@@ -1,13 +1,13 @@
 /**
  * Camera-grid footage: one video with several camera views tiled in it (2×2 CCTV mosaics are
- * common). Gemini reads each view far better as its own full-resolution clip than as a quarter
+ * common). The vision model reads each view far better as its own full-resolution clip than as a quarter
  * of a frame, so this finds the tiles and crops each into its own file with ffmpeg.
  *
  * Detection: tiles are separated by thin, uniformly dark gutter lines. We grab a few frames,
  * average each pixel column and row, and look for dark runs in the middle third of the frame
  * (gutters) and at the edges (letterbox, trimmed off). No gutters found = not a grid.
  *
- * ffmpeg: FFMPEG_PATH, or `ffmpeg` on PATH. Without it, grid videos are sent whole (Gemini is
+ * ffmpeg: FFMPEG_PATH, or `ffmpeg` on PATH. Without it, grid videos are sent whole (the vision model is
  * still told to read each tile), and the caller records why.
  */
 import { execFile } from "node:child_process";

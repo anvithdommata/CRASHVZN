@@ -7,9 +7,9 @@ from typing import Annotated
 
 import typer
 
-from BackEnd.pipeline.src.reconstruct.build import build_package
-from BackEnd.pipeline.src.reconstruct.paths import default_config
-from BackEnd.pipeline.src.reconstruct.validate import validate_package
+from reconstruct.build import build_package
+from reconstruct.paths import default_config
+from reconstruct.validate import validate_package
 
 app = typer.Typer(
     add_completion=False,

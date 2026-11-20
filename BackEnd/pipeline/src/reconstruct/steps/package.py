@@ -5,15 +5,15 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from BackEnd.pipeline.src.reconstruct.models import CamerasFile, EntitiesFile, EventsFile, Manifest, TracksFile
-from BackEnd.pipeline.src.reconstruct.splats import (
+from reconstruct.models import CamerasFile, EntitiesFile, EventsFile, Manifest, TracksFile
+from reconstruct.splats import (
     highway_gaussians,
     vehicle_gaussians,
     write_ply,
     hex_to_rgb,
 )
-from BackEnd.pipeline.src.reconstruct.steps.attributes import CLASS_LEGEND
-from BackEnd.pipeline.src.reconstruct.validate import validate_package
+from reconstruct.steps.attributes import CLASS_LEGEND
+from reconstruct.validate import validate_package
 
 
 def write_package(

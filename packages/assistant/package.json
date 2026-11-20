@@ -1,5 +1,5 @@
 {
-  "name": "@reconstruct/assistant",
+  "name": "@crashvzn/assistant",
   "version": "0.1.0",
   "private": true,
   "description": "Assistant layer: MCP server, LLM provider adapters (Claude/Codex/Gemini CLIs + API key), system prompt, fast path.",

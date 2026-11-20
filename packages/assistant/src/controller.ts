@@ -20,7 +20,7 @@ import type {
 } from "./types";
 
 /**
- * The contract between the assistant (person 4) and the app state (person 3).
+ * The contract between the assistant and the app state.
  *
  * The app implements this on top of its Zustand store. Every MCP tool, the
  * fast path, and the API-key adapters call *only* these functions, so the

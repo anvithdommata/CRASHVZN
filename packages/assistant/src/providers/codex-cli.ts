@@ -18,7 +18,7 @@ const toml = (s: string) => JSON.stringify(s);
  * Lock-down (flags verified with codex-cli 0.167):
  *   --ignore-user-config        skip ~/.codex/config.toml (the user's MCP servers, profiles); auth still works
  *   sandbox_mode="read-only"    and every tool feature that can touch the machine or web is disabled
- *   mcp_servers.reconstruct.*   our server, bearer token passed by env var name (never on the command line)
+ *   mcp_servers.crashvzn.*   our server, bearer token passed by env var name (never on the command line)
  *   developer_instructions      our system prompt
  *
  * The JSONL event handling follows Codex's documented `exec --json` schema
@@ -28,15 +28,15 @@ const toml = (s: string) => JSON.stringify(s);
  */
 export class CodexCliAdapter implements ProviderAdapter {
   readonly kind = "codex" as const;
-  private dir: string | null = null;
-  private child: ChildProcess | null = null;
+  /** No workspace yet, a workspace with no turn running, or a `codex exec` process running a turn. */
+  private state: { kind: "stopped" } | { kind: "idle"; dir: string } | { kind: "turn"; dir: string; child: ChildProcess } = { kind: "stopped" };
   threadId: string | null = null;
 
   constructor(private opts: AdapterOptions) {}
 
   async start(): Promise<void> {
     if (!resolveCli("codex")) throw new Error("Codex CLI isn't installed (no `codex` on PATH).");
-    this.dir ??= await mkdtemp(join(tmpdir(), "reconstruct-codex-"));
+    if (this.state.kind === "stopped") this.state = { kind: "idle", dir: await mkdtemp(join(tmpdir(), "crashvzn-codex-")) };
   }
 
   private args(): string[] {
@@ -62,18 +62,20 @@ export class CodexCliAdapter implements ProviderAdapter {
 
   async *send(message: string): AsyncIterable<AssistantEvent> {
     await this.start();
-    if (this.child) throw new Error("A turn is already running; wait for it or interrupt().");
+    if (this.state.kind === "turn") throw new Error("A turn is already running; wait for it or interrupt().");
+    if (this.state.kind !== "idle") throw new Error("Codex adapter was stopped.");
+    const { dir } = this.state;
     const cli = resolveCli("codex")!;
     const q = new EventQueue<AssistantEvent>();
     const tools = new Map<string, string>();
     const started = Date.now();
 
     const child = spawnCli(cli, this.args(), {
-      cwd: this.dir!,
+      cwd: dir,
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, ...this.opts.env, [TOKEN_ENV]: this.opts.mcp.token },
     });
-    this.child = child;
+    this.state = { kind: "turn", dir, child };
     let stderr = "";
     let failed = false;
     child.stderr!.on("data", (d) => (stderr = (stderr + d).slice(-4000)));
@@ -116,7 +118,7 @@ export class CodexCliAdapter implements ProviderAdapter {
       q.close();
     });
     child.on("close", (code) => {
-      this.child = null;
+      if (this.state.kind === "turn" && this.state.child === child) this.state = { kind: "idle", dir };
       if (!failed) {
         if (code === 0) q.push({ type: "done", sessionId: this.threadId ?? undefined, durationMs: Date.now() - started });
         else q.push({ type: "error", message: `Codex exited (code ${code}). ${stderr.trim().split("\n").slice(-3).join(" ")}`.trim() });
@@ -129,13 +131,14 @@ export class CodexCliAdapter implements ProviderAdapter {
   }
 
   async interrupt(): Promise<void> {
-    this.child?.kill();
+    if (this.state.kind === "turn") this.state.child.kill();
   }
 
   async stop(): Promise<void> {
-    this.child?.kill();
-    this.child = null;
-    if (this.dir) await rm(this.dir, { recursive: true, force: true }).catch(() => {});
-    this.dir = null;
+    const state = this.state;
+    this.state = { kind: "stopped" };
+    if (state.kind === "stopped") return;
+    if (state.kind === "turn") state.child.kill();
+    await rm(state.dir, { recursive: true, force: true }).catch(() => {});
   }
 }

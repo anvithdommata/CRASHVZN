@@ -44,7 +44,7 @@ export function FAQ() {
             Reconstruction is a tool for understanding, not a verdict. Here’s what the app does,
             what it doesn’t, and where your evidence lives.
           </p>
-          <a href="https://github.com/AarnavKannan/sunhacks#readme" target="_blank" rel="noreferrer">
+          <a href="https://github.com/anvithdommata/CRASHVZN#readme" target="_blank" rel="noreferrer">
             Read the project docs <span>↗</span>
           </a>
         </Reveal>

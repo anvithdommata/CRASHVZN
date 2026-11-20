@@ -8,9 +8,9 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from BackEnd.pipeline.src.reconstruct.geometry import crops_avoid_gutters, quadrant_crops
-from BackEnd.pipeline.src.reconstruct.models import Crop
-from BackEnd.pipeline.src.reconstruct.steps.cache import write_step_cache
+from reconstruct.geometry import crops_avoid_gutters, quadrant_crops
+from reconstruct.models import Crop
+from reconstruct.steps.cache import write_step_cache
 
 
 @dataclass(frozen=True)

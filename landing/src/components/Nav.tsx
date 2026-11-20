@@ -48,7 +48,7 @@ export function Nav() {
           <div className="nav-actions">
             <a
               className="nav-github"
-              href="https://github.com/AarnavKannan/sunhacks"
+              href="https://github.com/anvithdommata/CRASHVZN"
               target="_blank"
               rel="noreferrer"
               aria-label="CRASHVZN on GitHub"
@@ -87,7 +87,7 @@ export function Nav() {
           <DownloadButton className="w-full" />
           <a
             className="nav-github"
-            href="https://github.com/AarnavKannan/sunhacks"
+            href="https://github.com/anvithdommata/CRASHVZN"
             target="_blank"
             rel="noreferrer"
           >

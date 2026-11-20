@@ -1,5 +1,5 @@
 {
-  "name": "reconstruct-viewer",
+  "name": "crashvzn-app",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,6 +8,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "npm run build:assistant && tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
+    "test": "cd ../.. && node packages/assistant/node_modules/tsx/dist/cli.mjs --tsconfig FrontEnd/app/tsconfig.json FrontEnd/app/tests/motion-observations.test.ts && node packages/assistant/node_modules/tsx/dist/cli.mjs --tsconfig FrontEnd/app/tsconfig.json FrontEnd/app/tests/codex-vision.test.ts && node FrontEnd/app/tests/collision.test.mjs",
     "start": "npm run build:assistant && concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "build:assistant": "esbuild electron/assistant.ts --bundle --platform=node --format=cjs --target=node22 --external:electron --external:mongodb --external:mongodb-memory-server --loader:.md=text --outfile=electron/assistant.bundle.cjs --log-level=warning"
   },

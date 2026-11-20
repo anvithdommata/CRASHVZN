@@ -1,15 +1,17 @@
 # Scene package
 
-The desktop app and the MCP tools load a **folder**. There is no server and no database. `incident-demo` is the package for `demo.mp4`. Vehicle tracks are measured from the class-colored boxes in that video, then smoothed. They are not authored paths.
+> Output of the earlier `reconstruct` pipeline. The desktop app does not load this format today; it uses the incident spec described in [docs/vision-pipeline.md](../../docs/vision-pipeline.md).
+
+The package is a self-contained **folder**, designed for the app and MCP tools to load. There is no server and no database. `incident-demo` is the package for `demo.mp4`. Vehicle tracks are measured from the class-colored boxes in that video, then smoothed. They are not authored paths.
 
 Regenerate it from the repo root with:
 
 ```sh
-pipeline/.venv/bin/reconstruct build
-pipeline/.venv/bin/reconstruct validate scene-packages/incident-demo
+BackEnd/pipeline/.venv/bin/reconstruct build
+BackEnd/pipeline/.venv/bin/reconstruct validate BackEnd/scene-packages/incident-demo
 ```
 
-JSON Schema in [`schema/`](../schema/) is the source of truth. The pipeline checks every write with those schemas and with the matching Pydantic models. TypeScript types for the app live in [`shared/scene-types/index.ts`](../shared/scene-types/index.ts).
+JSON Schema in [`schema/`](../schema/) is the source of truth. The pipeline checks every write with those schemas and with the matching Pydantic models. Matching TypeScript types live in [`BackEnd/scene-types/index.ts`](../scene-types/index.ts).
 
 ## This clip has an accident
 

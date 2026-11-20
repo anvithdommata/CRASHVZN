@@ -8,8 +8,8 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
-from BackEnd.pipeline.src.reconstruct.geometry import crop_touches_span
-from BackEnd.pipeline.src.reconstruct.models import (
+from reconstruct.geometry import crop_touches_span
+from reconstruct.models import (
     CamerasFile,
     EntitiesFile,
     EventsFile,
@@ -17,8 +17,8 @@ from BackEnd.pipeline.src.reconstruct.models import (
     ScenePackage,
     TracksFile,
 )
-from BackEnd.pipeline.src.reconstruct.paths import schema_dir
-from BackEnd.pipeline.src.reconstruct.steps.ingest import sha256_file
+from reconstruct.paths import schema_dir
+from reconstruct.steps.ingest import sha256_file
 
 _FILES = {
     "manifest": ("manifest.json", Manifest),

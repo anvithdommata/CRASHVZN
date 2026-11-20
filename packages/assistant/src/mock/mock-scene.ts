@@ -117,7 +117,7 @@ export class MockSceneController implements SceneController {
   camera: CameraState = structuredClone(DEFAULT_CAMERA);
   timeline: TimelineState = { t_s: 0, duration_s: DURATION, playing: false, speed: 1, t_rel_crash_s: -CRASH.start_s, phase: "before_crash" };
   markers: Marker[] = [];
-  toggles: Record<string, boolean> = { trails: false, frustums: false, source_video: false, bounds: true };
+  toggles: Record<string, boolean> = { trails: false, source_video: false, bounds: true };
   openId: string | null;
   /** Every call, in order — handy in tests and the dev CLI. */
   log: { method: string; args: unknown[] }[] = [];

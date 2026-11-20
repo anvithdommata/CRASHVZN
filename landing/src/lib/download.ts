@@ -7,7 +7,7 @@ export type DownloadTarget = {
   direct: boolean;
 };
 
-const DEFAULT_REPO = "AarnavKannan/sunhacks";
+const DEFAULT_REPO = "anvithdommata/CRASHVZN";
 const repo = import.meta.env.VITE_GITHUB_REPO?.trim() || DEFAULT_REPO;
 const version = import.meta.env.VITE_DOWNLOAD_VERSION?.trim() || "0.1.0";
 const override = import.meta.env.VITE_DOWNLOAD_URL?.trim();

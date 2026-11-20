@@ -14,7 +14,7 @@ export type CrashSample = {
   position: Vec3;
   /** Force the road applied through the tyres (N), when the database has the breakdown. */
   tyre?: Vec3;
-  /** Gemini's own force reading near this time. */
+  /** The vision model's own force reading near this time. */
   reported?: { vector: Vec3; cause: string; note: string } | null;
 };
 
@@ -97,7 +97,7 @@ export async function computeCrashForces(input: {
       impulse: { vector: r3(impulse, 0), magnitude: { value: Math.round(len(impulse)), unit: "N·s" }, direction_compass: compassOf(dv) },
       average_force: { magnitude: newtons(len(impulse) / PULSE_S), pulse_s: PULSE_S, g: round(len(dv) / PULSE_S / G, 1) },
       slide: { distance: { m: round(distance, 1), ft: round(distance * 3.28084, 1) }, duration_s: round(duration, 1), mean_tyre_force: newtons(meanTyre) },
-      reported_by_gemini: reported.slice(0, 6),
+      reported_by_model: reported.slice(0, 6),
     });
   }
   if (out.length === 0) throw new Error("The database has no motion for the vehicles in the crash.");

@@ -125,7 +125,7 @@ folder and are not part of the repo.
 | [Transformers.js](https://github.com/huggingface/transformers.js) Whisper in the renderer (Apache-2.0) | Considered as the voice engine. Installs as pure JS/WASM, but WASM Whisper on the CPU is several times slower than native ONNX Runtime, and in the renderer it competes with the 3D view for the main thread and GPU. |
 | Moonshine base and Whisper base.en through sherpa-onnx | Smaller downloads (about 290 MB and 160 MB int8) but less accurate than Parakeet TDT v2 for English dictation. Not wired in. |
 
-## Planned pipeline projects (from `requirements.md`)
+## Planned pipeline projects (from `docs/history/hackathon-requirements.md`)
 
 These aren't in the repo yet. When one goes in, move it into a table above and confirm its
 license from the repo's `LICENSE` file, and its model-weights license, at the version we use.

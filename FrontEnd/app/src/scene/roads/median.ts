@@ -5,7 +5,7 @@
  * Footprints are plan-frame polygons (x along the road, y to its left); the scene is x = plan x,
  * z = -plan y.
  */
-import type { StaticObject } from "@/gemini/spec";
+import type { StaticObject } from "@/incident/spec";
 import type { P, Painter } from "@/scene/draw";
 
 const toScene = (footprint: [number, number][]): P[] => footprint.map(([x, y]) => [x, -y]);

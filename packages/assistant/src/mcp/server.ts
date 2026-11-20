@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { SceneController } from "../controller";
 import { callTool, TOOLS } from "../tools/registry";
 
-export const MCP_SERVER_NAME = "reconstruct";
+export const MCP_SERVER_NAME = "crashvzn";
 
 export interface RunningMcpServer {
   /** e.g. http://127.0.0.1:53121/mcp */

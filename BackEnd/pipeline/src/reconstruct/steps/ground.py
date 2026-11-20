@@ -17,7 +17,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from BackEnd.pipeline.src.reconstruct.models import CarriagewayId
+from reconstruct.models import CarriagewayId
 
 
 @dataclass(frozen=True)

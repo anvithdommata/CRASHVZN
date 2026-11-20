@@ -59,7 +59,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 function voiceBridge() {
   try {
-    return typeof window !== "undefined" ? (window.reconstruct?.voice ?? null) : null;
+    return typeof window !== "undefined" ? (window.crashvzn?.voice ?? null) : null;
   } catch {
     return null;
   }

@@ -14,9 +14,9 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from BackEnd.pipeline.src.reconstruct import __version__
-from BackEnd.pipeline.src.reconstruct.geometry import camera_forward, look_quaternion
-from BackEnd.pipeline.src.reconstruct.models import (
+from reconstruct import __version__
+from reconstruct.geometry import camera_forward, look_quaternion
+from reconstruct.models import (
     SCHEMA_VERSION,
     Camera,
     CamerasFile,
@@ -43,26 +43,26 @@ from BackEnd.pipeline.src.reconstruct.models import (
     TracksFile,
     Units,
 )
-from BackEnd.pipeline.src.reconstruct.paths import repo_root
-from BackEnd.pipeline.src.reconstruct.steps.associate import (
+from reconstruct.paths import repo_root
+from reconstruct.steps.associate import (
     LiftedLocal,
     align_cameras,
     associate,
 )
-from BackEnd.pipeline.src.reconstruct.steps.attributes import CLASS_LEGEND, paint_name, resolve_entities
-from BackEnd.pipeline.src.reconstruct.steps.boxes import detect_boxes
-from BackEnd.pipeline.src.reconstruct.steps.cache import write_step_cache
-from BackEnd.pipeline.src.reconstruct.steps.detect_track import LocalTrack, link_tracks
-from BackEnd.pipeline.src.reconstruct.steps.frames import iter_rgb_frames
-from BackEnd.pipeline.src.reconstruct.steps.ground import (
+from reconstruct.steps.attributes import CLASS_LEGEND, paint_name, resolve_entities
+from reconstruct.steps.boxes import detect_boxes
+from reconstruct.steps.cache import write_step_cache
+from reconstruct.steps.detect_track import LocalTrack, link_tracks
+from reconstruct.steps.frames import iter_rgb_frames
+from reconstruct.steps.ground import (
     GroundPlane,
     fit_ground,
     flipped_depth,
     flipped_lateral,
     pixel_to_xz,
 )
-from BackEnd.pipeline.src.reconstruct.steps.ingest import ingest_mosaic
-from BackEnd.pipeline.src.reconstruct.steps.kinematics import (
+from reconstruct.steps.ingest import ingest_mosaic
+from reconstruct.steps.kinematics import (
     VIDEO_JERK_SIGMA,
     VIDEO_MEAS_SIGMA_M,
     brake_events,
@@ -74,8 +74,8 @@ from BackEnd.pipeline.src.reconstruct.steps.kinematics import (
     crash_rest_onset_s,
     smooth_track,
 )
-from BackEnd.pipeline.src.reconstruct.steps.package import write_package
-from BackEnd.pipeline.src.reconstruct.steps.scale import cache_scale, scale_from_lane_width
+from reconstruct.steps.package import write_package
+from reconstruct.steps.scale import cache_scale, scale_from_lane_width
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ def build_package(
     if package_dir in {root.resolve(), Path("/").resolve(), Path.home().resolve()}:
         raise ValueError(f"refusing to replace {package_dir}")
 
-    cache = cache_dir or (root / "pipeline" / ".cache" / config["incident_id"])
+    cache = cache_dir or (root / "BackEnd" / "pipeline" / ".cache" / config["incident_id"])
     mosaic = root / config["mosaic"]
     ingested = ingest_mosaic(mosaic, config, cache)
     sigma = Sigma(**config["sigma"])

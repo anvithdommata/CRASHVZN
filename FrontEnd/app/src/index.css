@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+/*
+ * One dark theme for the whole app: the library, both side panels, the timeline and overlays.
+ * Use these tokens (bg-panel, text-ink-2, border-line, bg-accent…) rather than raw colours.
+ * Red is reserved for the crash itself; the accent is for everything interactive.
+ */
+@theme {
+  --color-canvas: #08090b;
+  --color-panel: #101114;
+  --color-raised: #17181c;
+  --color-sunken: #0b0c0e;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.16);
+  --color-ink: #f1f2f4;
+  --color-ink-2: rgb(241 242 244 / 0.68);
+  --color-ink-3: rgb(241 242 244 / 0.42);
+  --color-accent: #6aa2ff;
+  --color-accent-strong: #4f8cff;
+  --color-accent-soft: rgb(106 162 255 / 0.14);
+  --color-crash: #ff5a5a;
+  --color-crash-soft: rgb(255 90 90 / 0.14);
+  --color-ok: #4ade80;
+  --color-warn: #fbbf24;
+}
+
 html,
 body,
 #root {
@@ -8,13 +32,65 @@ body,
 }
 
 body {
-  color-scheme: light;
-  font-family: Roboto, "Segoe UI", sans-serif;
+  color-scheme: dark;
+  font-family: Inter, Roboto, "Segoe UI", sans-serif;
   overflow: hidden;
-  background: #0a2378;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Thin, quiet scrollbars on the dark surfaces. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.14);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Number inputs: no spinner arrows; the panels use steppers and Enter to commit. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-panel-in {
+  animation: panel-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-panel-in {
+    animation: none;
+  }
 }

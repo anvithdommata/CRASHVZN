@@ -16,7 +16,7 @@ import math
 
 import numpy as np
 
-from BackEnd.pipeline.src.reconstruct.models import Crop
+from reconstruct.models import Crop
 
 
 def quintic(u: float) -> float:

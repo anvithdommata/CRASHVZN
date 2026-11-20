@@ -31,3 +31,31 @@ export class EventQueue<T> implements AsyncIterable<T> {
     };
   }
 }
+
+/**
+ * The one turn an adapter may have in flight. A turn is active from `begin()` until its queue is
+ * closed (done, error, or `fail()`); only then can the next one begin.
+ */
+export class TurnSlot<T> {
+  private queue: EventQueue<T> | null = null;
+
+  /** Starts a turn. Throws if one is still running. */
+  begin(): EventQueue<T> {
+    if (this.active) throw new Error("A turn is already running; wait for it or interrupt().");
+    this.queue = new EventQueue<T>();
+    return this.queue;
+  }
+
+  /** The running turn's queue, or null when no turn is running. */
+  get active(): EventQueue<T> | null {
+    return this.queue && !this.queue.isClosed ? this.queue : null;
+  }
+
+  /** Ends the running turn (if any) with a final event. */
+  end(last: T): void {
+    const q = this.active;
+    if (!q) return;
+    q.push(last);
+    q.close();
+  }
+}

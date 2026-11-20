@@ -39,13 +39,14 @@ export function Timeline() {
       className={`absolute right-4 bottom-4 z-20 ${resizing ? "" : "transition-[left] duration-200 ease-in-out"}`}
       style={{ left: (panelOpen ? leftWidth : LEFT_RAIL) + 16 }}
     >
-      <div className="rounded-2xl border border-white/10 bg-[#071433]/80 px-4 py-3 text-white shadow-lg backdrop-blur-md">
+      <div className="rounded-2xl border border-line bg-panel/85 px-4 py-3 text-ink shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <div className="mb-1 flex items-center gap-3">
           <button
             type="button"
             aria-label={playing ? "Pause" : "Play"}
+            title={`${playing ? "Pause" : "Play"} (Space) · ← → step 0.1 s, Shift for 1 s`}
             onClick={togglePlay}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-900"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black transition-transform hover:scale-105"
           >
             {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
           </button>
@@ -62,7 +63,7 @@ export function Timeline() {
               className="rounded-md border border-white/15 bg-white/10 px-1.5 py-1 text-xs text-white tabular-nums outline-none hover:bg-white/15 focus:border-white/40"
             >
               {speedOptions.map((option) => (
-                <option key={option} value={option} className="bg-[#071433]">
+                <option key={option} value={option} className="bg-panel">
                   {option}×
                 </option>
               ))}
@@ -104,7 +105,7 @@ export function Timeline() {
           }}
         >
           <div className="absolute top-1/2 right-0 left-0 h-1.5 -translate-y-1/2 rounded-full bg-white/25">
-            <div className="h-full rounded-full bg-white" style={{ width: `${fraction * 100}%` }} />
+            <div className="h-full rounded-full bg-accent" style={{ width: `${fraction * 100}%` }} />
           </div>
           {impactFraction != null && endFraction != null && endFraction > impactFraction && (
             <div
@@ -128,7 +129,7 @@ export function Timeline() {
             />
           )}
           <div
-            className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-900 bg-white shadow"
+            className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-accent bg-white shadow"
             style={{ left: `${fraction * 100}%` }}
           />
         </div>

@@ -13,7 +13,7 @@ Writes <output>.build.json with the actual transform, source SHA-256s and stable
 World frame W (measure/README.md): X along the road AWAY from the camera, Y to the camera's RIGHT,
 heading 0 = +X, 90 = +Y. The crash carriageway is at negative Y with traffic moving -X.
 
-App plan frame (src/gemini/spec.ts): x along the road with the crash carriageway's traffic moving
+App plan frame (src/incident/spec.ts): x along the road with the crash carriageway's traffic moving
 +x; y to the LEFT when facing +x; heading 0 = +x, 90 = +y. A vehicle driving toward the camera
 (-X) faces +x, and its left is the camera's right (+Y), so
 
@@ -33,7 +33,7 @@ LAST_FRAME = 399
 # The road is drawn from the measured painted lines (spec.road.lane_lines_*_m, engine.ts measuredDividedRoad).
 
 FORCE_CAUSES = {"braking", "accelerating", "steering", "impact", "sliding", "rolling_resistance", "drag", "coasting", "other"}
-CATEGORY_DEFAULTS = {  # src/gemini/spec.ts
+CATEGORY_DEFAULTS = {  # src/incident/spec.ts
     "sedan": (4.7, 1.82, 1500), "hatchback": (4.2, 1.78, 1250), "suv": (4.8, 1.92, 1900), "pickup": (5.6, 2.0, 2300),
     "van": (5.2, 2.0, 2200), "truck": (8.5, 2.5, 9000), "bus": (12, 2.55, 12000), "motorcycle": (2.1, 0.8, 250),
     "bicycle": (1.8, 0.6, 95), "pedestrian": (0.5, 0.5, 75), "other": (4.5, 1.8, 1500),

@@ -105,8 +105,8 @@ export async function startExport(range: [number, number]): Promise<ExportJob> {
       const blob = new Blob(chunks, { type: mimeType || "video/webm" });
       const safeTitle = scene.title.replace(/[^\w-]+/g, "_").slice(0, 60) || "reconstruction";
       const fileName = `${safeTitle}_${range[0].toFixed(1)}-${range[1].toFixed(1)}s_demonstrative.${extension}`;
-      if (window.reconstruct?.saveExport) {
-        const path = await window.reconstruct.saveExport(new Uint8Array(await blob.arrayBuffer()), fileName);
+      if (window.crashvzn?.saveExport) {
+        const path = await window.crashvzn.saveExport(new Uint8Array(await blob.arrayBuffer()), fileName);
         update(path ? { status: "done", path } : { status: "cancelled" });
       } else {
         const url = URL.createObjectURL(blob);

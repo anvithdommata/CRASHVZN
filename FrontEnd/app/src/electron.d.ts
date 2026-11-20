@@ -31,6 +31,53 @@ export type AssistantBridgeEvent = {
   event: { type: string; source?: string; [key: string]: unknown };
 };
 
+export type ProcessorKind = "codex" | "claude";
+
+/** One video-processing provider on the Providers page (electron/vision.ts + providers.ts). */
+export type ProcessorStatus = {
+  provider: ProcessorKind;
+  label: string;
+  detail: string;
+  cli: string;
+  models: string[];
+  defaultModel: string;
+  effort: string;
+  health?: AssistantProviderHealth;
+  /** Signed in with the right kind of account (ChatGPT / Claude subscription). */
+  usable: boolean;
+  hint?: string;
+};
+
+/** One chat provider: catalog entry (packages/assistant/src/providers/catalog.ts) + live health. */
+export type ChatProviderStatus = {
+  kind: string;
+  label: string;
+  detail: string;
+  auth: "cli" | "api-key";
+  cli?: string;
+  login?: { args: string[]; browser: boolean };
+  install?: { command?: string; url: string };
+  apiKeyEnv?: string;
+  chat: boolean;
+  tested: "verified" | "partial" | "unverified";
+  models: { id: string; label: string }[];
+  efforts: AssistantEffort[];
+  health?: AssistantProviderHealth;
+  /** API-key providers: whether a key is stored (never the key itself). */
+  keyStored?: boolean;
+};
+
+export type ProvidersStatus = {
+  settings: { processor: { provider: ProcessorKind; model?: string }; chat: { provider?: string; model?: string; effort?: string } };
+  processors: ProcessorStatus[];
+  chat: ChatProviderStatus[];
+  unsupported: { label: string; why: string }[];
+  /** Whether OS-backed encryption is available for storing API keys. */
+  encryption: boolean;
+};
+
+export type ProviderLoginEvent = { kind: string; state: "running" | "url" | "done" | "error" | "cancelled"; url?: string; message?: string };
+
 export type KinVec3 = [number, number, number];
 
 /** One object at one moment, as stored in MongoDB (see electron/kinematics.ts). World frame, SI units. */
@@ -54,7 +101,7 @@ export type KinematicsFrame = {
    * crash period, the impact. They sum to force_net.
    */
   force_parts?: { tyre_road: KinVec3; drag: KinVec3; rolling: KinVec3; grade: KinVec3; contact: KinVec3 };
-  /** Gemini's own reading of the force from the footage, when it gave one near this time. */
+  /** The vision model's own reading of the force from the footage, when it gave one near this time. */
   force_reported?: { vector: KinVec3; cause: string; note: string } | null;
   /** Precision tier: "crash" (precise) or "background" (approximate). */
   involvement?: "crash" | "background";
@@ -122,11 +169,11 @@ export type KinematicsContact = {
   note: string | null;
 };
 
-/** A Gemini analysis of uploaded footage (electron/gemini.ts), already validated by gemini/spec.ts. */
-export type GeminiAnalysis = { analysisId: string; spec: import("@/gemini/spec").IncidentSpec; cached: boolean; models: string[] };
+/** A vision-model analysis of uploaded footage (electron/analysis.ts), already validated by incident/spec.ts. */
+export type IncidentAnalysis = { analysisId: string; spec: import("@/incident/spec").IncidentSpec; cached: boolean; models: string[] };
 
-/** A Gemini scene saved in MongoDB: rebuilt from its analysis and seed at startup. */
-export type GeminiSceneRecord = {
+/** A reconstructed scene saved in MongoDB: rebuilt from its analysis and seed at startup. */
+export type SavedSceneRecord = {
   sceneId: string;
   analysisId: string;
   seed: number;
@@ -135,14 +182,14 @@ export type GeminiSceneRecord = {
   report?: unknown;
 };
 
-export type GeminiProgress = { stage: string; detail?: string };
+export type AnalysisProgress = { stage: string; detail?: string };
 
 export type SceneCallMessage = { id: number; method: string; args: unknown[] };
 export type SceneResultMessage = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
 declare global {
   interface Window {
-    reconstruct?: {
+    crashvzn?: {
       isDesktop: boolean;
       stageVideos: (files: File[]) => Promise<StagedIncident>;
       assistant: {
@@ -153,6 +200,20 @@ declare global {
         send: (text: string) => Promise<{ turn: number }>;
         interrupt: () => Promise<void>;
         onEvent: (callback: (payload: AssistantBridgeEvent) => void) => () => void;
+      };
+      providers: {
+        status: (refresh?: boolean) => Promise<ProvidersStatus>;
+        check: (kind: string) => Promise<AssistantProviderHealth>;
+        /** Runs the CLI's own login (browser OAuth), or opens a terminal for interactive logins. */
+        login: (kind: string) => Promise<{ mode: "browser" | "terminal" }>;
+        cancelLogin: (kind: string) => Promise<void>;
+        openTerminal: (kind: string, purpose?: "login" | "install") => Promise<void>;
+        openUrl: (url: string) => Promise<void>;
+        setKey: (kind: string, value: string) => Promise<{ stored: boolean }>;
+        clearKey: (kind: string) => Promise<{ stored: boolean }>;
+        setProcessor: (choice: { provider: ProcessorKind; model?: string }) => Promise<ProvidersStatus["settings"]>;
+        onLoginEvent: (callback: (event: ProviderLoginEvent) => void) => () => void;
+        onChanged: (callback: () => void) => () => void;
       };
       scene: {
         onCall: (callback: (message: SceneCallMessage) => void) => () => void;
@@ -165,13 +226,15 @@ declare global {
         sample: (incidentId: string, entityId: string, times: number[]) => Promise<(KinematicsFrame | null)[]>;
         positions: (incidentId: string, t: number) => Promise<{ entity_id: string; position: KinVec3 }[]>;
       };
-      /** Footage → scene description via the Gemini API (key stays in the main process). */
-      gemini: {
-        status: () => Promise<{ configured: boolean; models: { fast: string; precise: string } }>;
-        analyze: (files: File[], opts?: { refresh?: boolean; durations?: (number | null)[] }) => Promise<GeminiAnalysis>;
-        saveScene: (record: GeminiSceneRecord) => Promise<void>;
-        listScenes: () => Promise<(GeminiSceneRecord & { spec: import("@/gemini/spec").IncidentSpec })[]>;
-        onProgress: (callback: (progress: GeminiProgress) => void) => () => void;
+      /** Footage → scene description via the active video processor (Codex or Claude Code), plus saved scenes. */
+      analysis: {
+        status: () => Promise<{ configured: boolean; models: { fast: string; precise: string }; provider?: ProcessorKind; providerName?: string; error?: string }>;
+        analyze: (files: File[], opts?: { refresh?: boolean; durations?: (number | null)[] }) => Promise<IncidentAnalysis>;
+        saveScene: (record: SavedSceneRecord) => Promise<void>;
+        listScenes: () => Promise<(SavedSceneRecord & { spec: import("@/incident/spec").IncidentSpec })[]>;
+        /** Removes a saved reconstruction and its motion data (the footage reading stays cached). */
+        deleteScene: (sceneId: string) => Promise<void>;
+        onProgress: (callback: (progress: AnalysisProgress) => void) => () => void;
       };
       /** Resolves to the saved path, or null if the user cancelled the save dialog. */
       saveExport: (bytes: Uint8Array, fileName: string) => Promise<string | null>;

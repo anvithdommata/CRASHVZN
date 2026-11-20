@@ -426,7 +426,7 @@ export function getLayout(id: string) {
   return layouts.get(id);
 }
 
-/** Adds a layout built at runtime (Gemini reconstructions, see gemini/engine.ts). Replaces one with the same id. */
+/** Adds a layout built at runtime (AI and measured reconstructions, see incident/engine.ts). Replaces one with the same id. */
 export function registerLayout(layout: Layout) {
   layouts.set(layout.id, layout);
 }
