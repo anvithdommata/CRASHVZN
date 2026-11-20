@@ -7,10 +7,6 @@ crash from any angle, read per-frame vehicle motion (position, speed, accelerati
 drive the view by typing or talking to an AI assistant ("focus on the yellow car", "jump to impact,
 how fast was it going?").
 
-It started as a four-person [SunHacks](https://github.com/AarnavKannan/sunhacks) project and is being
-continued in this fork. It is a research/demo application: positions and forces are estimates from
-uncalibrated video, not validated forensic measurements.
-
 ![The CRASHVZN viewer: camera controls on the left, the 3D replay with a timeline in the middle, the assistant on the right](landing/public/media/reconstruction-workspace.png)
 
 *The viewer in an earlier build (the 59 s fallback demo scene); the current demo uses the measured 32 s reconstruction.*
