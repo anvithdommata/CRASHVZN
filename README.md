@@ -7,9 +7,9 @@ crash from any angle, read per-frame vehicle motion (position, speed, accelerati
 drive the view by typing or talking to an AI assistant ("focus on the yellow car", "jump to impact,
 how fast was it going?").
 
-![The CRASHVZN viewer: camera controls on the left, the 3D replay with a timeline in the middle, the assistant on the right](landing/public/media/reconstruction-workspace.png)
+![The CRASHVZN viewer: vehicles with live speeds on the left, the 3D replay with a timeline in the middle, the assistant on the right](assets/screenshots/viewer-a9-crash.png)
 
-*The viewer in an earlier build (the 59 s fallback demo scene); the current demo uses the measured 32 s reconstruction.*
+*The measured A9 demo at the start of the crash: the yellow car reaching the stopped white van.*
 
 ## How it works
 
